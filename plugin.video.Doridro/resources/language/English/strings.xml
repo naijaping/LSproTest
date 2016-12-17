@@ -1,0 +1,11 @@
+<strings>
+	<!-- Settings -->
+    <string id="10003">Login True</string>
+
+    <string id="10001">Doridro User Name</string>
+    <string id="10002">Doridro Password</string>
+
+    <string id="10004">Doridro Download Path</string>
+    <string id="10005">Google Search for thumbnail(!!slow!!)</string>
+
+</strings>
