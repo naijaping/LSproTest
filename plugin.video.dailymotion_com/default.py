@@ -136,7 +136,7 @@ def favouriteUsers():
 
 def listChannels():
     url = dmApiUrl % ("","","channels","","popular",other_part_OF_url)
-    xbmc.log(url,xbmc.LOGNOTICE)
+    #xbmc.log(url,xbmc.LOGNOTICE)
     content = getUrl(url.replace("&sort","sort"))
     content = json.loads(content)
     for item in content['list']:
@@ -212,9 +212,9 @@ def listVideos(url):
     dmUser = None
     if not '://' in url:
         dmUser = url.split(":",1)[1]
-        debug(dmUser)
+        #debug(dmUser)
         url = dmApiUserUrl %("user/",dmUser,"/videos","recent",urlfields,other_part_OF_url)
-        debug(url)
+        #debug(url)
         #url =  dmUserURL %(urlMain,url.split(":",1)[1],itemsPerPage,familyFilter,language)
     xbmcplugin.setContent(pluginhandle, "episodes")
     content = getUrl(url)
@@ -361,31 +361,36 @@ def getStreamUrl(id,live=False):
     else:
 
         cc= content['qualities']
-        xbmc.log(str(cc),xbmc.LOGNOTICE)
+        #xbmc.log(str(cc),xbmc.LOGNOTICE)
         if not live:
             xbmc.log('Not LIVE',xbmc.LOGNOTICE)#['380'][0]['url']
             #try:
              # 0 is x-mpeg dont work w/ kodi
             if cc.get('1080'):
-                url1080 = cc.get('1080')[1].get('url')
-                rr = requests.head(url1080,allow_redirects=True)
-                if not rr.headers.get('Content-Length') == '0' :
-                    return url1080
+                try:
+                    url1080 = cc.get('1080')[1].get('url')
+                    rr = requests.head(url1080,allow_redirects=True)
+                    if not rr.headers.get('Content-Length') == '0' :
+                        return url1080
+                except:
+                    pass
             
             if cc.get('720') :
             #ept Exception:
-            #try:
-                url1080 = cc.get('720')[1].get('url')
-                xbmc.log('720: '+ str(url1080),xbmc.LOGNOTICE)
-                rr = requests.head(url1080,allow_redirects=True)
-                if not rr.headers.get('Content-Length') == '0'  :
-                    xbmc.log('720: HEAD Request found',xbmc.LOGNOTICE)
-                    return url1080
+                try:
+                    url1080 = cc.get('720')[1].get('url')
+                    #xbmc.log('720: '+ str(url1080),xbmc.LOGNOTICE)
+                    rr = requests.head(url1080,allow_redirects=True)
+                    if not rr.headers.get('Content-Length') == '0'  :
+                        #xbmc.log('720: HEAD Request found',xbmc.LOGNOTICE)
+                        return url1080
+                except:
+                    pass
             if cc.get('480'):
-                xbmc.log('480 found : '+ str(cc.get('480')[1].get('url')),xbmc.LOGNOTICE)
+                #xbmc.log('480 found : '+ str(cc.get('480')[1].get('url')),xbmc.LOGNOTICE)
                 return cc.get('480')[1].get('url')
             if cc.get('380'):
-                xbmc.log('380 found : '+ str(cc.get('380')[1].get('url')),xbmc.LOGNOTICE)
+                #xbmc.log('380 found : '+ str(cc.get('380')[1].get('url')),xbmc.LOGNOTICE)
                 return cc.get('380')[1].get('url')
                 
             
