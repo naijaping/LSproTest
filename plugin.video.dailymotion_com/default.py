@@ -163,7 +163,7 @@ def sortVideos1(url):
 
 
     addDir('Visited', url.replace("sort=recent", "sort=visited"), 'sortVideos2', "")
-    addDir('Commented', url.replace("sort=recent", "sort=commented"), 'sortVideos2', "")
+    #addDir('Commented', url.replace("sort=recent", "sort=commented"), 'sortVideos2', "")
 
     if type == "owner":
         addDir("- "+translation(30038), urlMain+"/user/"+id+"/playlists?fields=id,name,videos_total&sort=recent&limit="+itemsPerPage+"&family_filter="+familyFilter+"&localization="+language+"&page=1", 'listUserPlaylists', "")
@@ -172,16 +172,17 @@ def sortVideos1(url):
 
 
 def sortVideos2(url): #works
+    #":"Unrecognized value (commented), allowed values are (recent, visited, visited-hour, visited-today, visited-week, visited-month, relevance, random, ranking, trending, old, live-audience) for `sort' 
     if "sort=visited" in url:
         addDir("Within Last Hour", url.replace("sort=visited", "sort=visited-hour"), "listVideos", "")
         addDir(translation(30011), url.replace("sort=visited", "sort=visited-today"), "listVideos", "")
         addDir(translation(30012), url.replace("sort=visited", "sort=visited-week"), "listVideos", "")
         addDir(translation(30013), url.replace("sort=visited", "sort=visited-month"), "listVideos", "")
-    if "sort=commented" in url:
-        addDir("Best commented in last hour", url.replace("sort=commented", "sort=commented-hour"), "listVideos", "")
-        addDir(translation(30011), url.replace("sort=commented", "sort=commented-today"), "listVideos", "")
-        addDir(translation(30012), url.replace("sort=commented", "sort=commented-week"), "listVideos", "")
-        addDir(translation(30013), url.replace("sort=commented", "sort=commented-month"), "listVideos", "")    
+   #if "sort=commented" in url:
+   #    addDir("Best commented in last hour", url.replace("sort=commented", "sort=commented-hour"), "listVideos", "")
+   #    addDir(translation(30011), url.replace("sort=commented", "sort=commented-today"), "listVideos", "")
+   #    addDir(translation(30012), url.replace("sort=commented", "sort=commented-week"), "listVideos", "")
+   #    addDir(translation(30013), url.replace("sort=commented", "sort=commented-month"), "listVideos", "")    
     addDir(translation(30014), url, 'listVideos', "")
     xbmcplugin.endOfDirectory(pluginhandle)
 
