@@ -12,6 +12,7 @@ import traceback
 import cookielib,base64
 import datetime,time
 from BeautifulSoup import BeautifulStoneSoup, BeautifulSoup, BeautifulSOAP
+import urlparse
 
 viewmode=None
 try:
@@ -22,9 +23,8 @@ try:
 except:
     import simplejson as json
 import SimpleDownloader as downloader
-import time
-tsdownloader=False
-hlsretry=False
+#tsdownloader=False
+#hlsretry=False
 resolve_url=['180upload.com', 'letwatch.us','allmyvideos.net', 'bestreams.net', 'clicknupload.com', 'cloudzilla.to', 'movshare.net', 'novamov.com', 'nowvideo.sx', 'videoweed.es', 'daclips.in', 'datemule.com', 'fastvideo.in', 'faststream.in', 'filehoot.com', 'filenuke.com', 'sharesix.com',  'plus.google.com', 'picasaweb.google.com', 'gorillavid.com', 'gorillavid.in', 'grifthost.com', 'hugefiles.net', 'ipithos.to', 'ishared.eu', 'kingfiles.net', 'mail.ru', 'my.mail.ru', 'videoapi.my.mail.ru', 'mightyupload.com', 'mooshare.biz', 'movdivx.com', 'movpod.net', 'movpod.in', 'movreel.com', 'mrfile.me', 'nosvideo.com', 'openload.io', 'played.to', 'bitshare.com', 'filefactory.com', 'k2s.cc', 'oboom.com', 'rapidgator.net', 'primeshare.tv', 'bitshare.com', 'filefactory.com', 'k2s.cc', 'oboom.com', 'rapidgator.net', 'sharerepo.com', 'stagevu.com', 'streamcloud.eu', 'streamin.to', 'thefile.me', 'thevideo.me', 'tusfiles.net', 'uploadc.com', 'zalaa.com', 'uploadrocket.net', 'uptobox.com', 'v-vids.com', 'veehd.com', 'vidbull.com', 'videomega.tv', 'vidplay.net', 'vidspot.net', 'vidto.me', 'vidzi.tv', 'vimeo.com', 'vk.com', 'vodlocker.com', 'xfileload.com', 'xvidstage.com', 'zettahost.tv']
 g_ignoreSetResolved=['plugin.video.dramasonline','plugin.video.f4mTester','plugin.video.shahidmbcnet','plugin.video.SportsDevil','plugin.stream.vaughnlive.tv','plugin.video.ZemTV-shani']
 art_tags = ['thumbnail', 'fanart', 'poster','clearlogo','banner','clearart']
@@ -80,7 +80,6 @@ else: SOURCES = []
 
 def GetLivestreamerLink(url):
     addon_log('GetLivestreamerLink' + url)
-    up_plugin_only = os.path.join(home, 'livestreamer')
     import streamlink
     s=streamlink.Streamlink()
     try:
@@ -94,7 +93,8 @@ def GetLivestreamerLink(url):
     final_url = ''
     if isinstance(stream, streamlink.stream.hls.HLSStream):
         return stream.url
-    else:
+    elif isinstance(stream, streamlink.stream.RTMPStream):
+        xbmc.log('RTMP Trouble ahead for kodi 17' + url)
         final_url = "{0} swfVfy=1 live=true timeout=15".format(stream.params["rtmp"])
         try:
             if stream.params["playpath"]:
