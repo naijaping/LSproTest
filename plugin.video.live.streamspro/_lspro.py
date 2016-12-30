@@ -65,12 +65,16 @@ communityfiles = os.path.join(profile, 'LivewebTV')
 libpyCode = os.path.join(profile,'libpyCode')
 downloader = downloader.SimpleDownloader()
 debug = addon.getSetting('debug')
-thumbAsFanart =addon.getSetting('use_thumb')
 disableepg =addon.getSetting('disableepg')
 logo_folder = addon.getSetting('logo_folderPath')
 groupm3ulinks = addon.getSetting('groupm3ulinks')
 
 LivewebTVepg = os.path.join(profile, 'LivewebTVepg')
+
+add_playlist = addon.getSetting('add_playlist')
+ask_playlist_items =addon.getSetting('ask_playlist_items')
+use_thumb = addon.getSetting('use_thumb')
+
 if os.path.exists(favorites)==True:
     FAV = open(favorites).read()
 else: FAV = []
@@ -311,13 +315,13 @@ def rmSource(name):
 
 
 def getSoup(url,data=None):
-        global viewmode,tsdownloader, hlsretry
-        tsdownloader=False
-        hlsretry=False
-        if addon.getSetting('tsdownloader') == 'true' :
-            tsdownloader = True
-        if addon.getSetting('hlsretry') == 'true' :
-            hlsretry = True        
+        #global viewmode,tsdownloader, hlsretry
+        #tsdownloader=False
+        #hlsretry=False
+        #if addon.getSetting('tsdownloader') == 'true' :
+        #    tsdownloader = True
+        #if addon.getSetting('hlsretry') == 'true' :
+        #    hlsretry = True        
         if url.startswith('http://') or url.startswith('https://'):
             enckey=False
             if '$$PLAYHEADERS=' in url:
@@ -1135,9 +1139,6 @@ def getItems(item,fanart,itemart={},item_info={},total=1):
                 isJsonrpc=True
             else:
                 isJsonrpc=False
-            #addon_log('item is: ' + str(item) )
-            #addon_log('item is: ' + str(type(item)) )
-            #addon_log('fanart in getItems is: ' + str(fanart) )
             if not itemart and not item_info:
                 itemart =  dict((art_tag.replace('thumbnail','thumb'),item(art_tag)[0].string) for art_tag in art_tags if item(art_tag) and item(art_tag)[0].string is not None)
                 item_info =  dict((art_tag.replace('info','plot'),item(art_tag)[0].string) for art_tag in info_tags if item(art_tag)and item(art_tag)[0].string is not None)
