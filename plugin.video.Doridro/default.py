@@ -11,6 +11,7 @@ import requests
 import re
 import settings
 import time
+from collections import OrderedDict
 
 try:
     import json
@@ -31,6 +32,7 @@ cacheDir = os.path.join( addonUserDataFolder, 'cache')
 
 clean_cache=os.path.join(cacheDir,'cleancacheafter1month')
 metadata_uls=os.path.join(cacheDir,'metadata_uls.txt')
+
 logos = None
 profile = xbmc.translatePath(addon.getAddonInfo('profile').decode('utf-8'))
 home = xbmc.translatePath(addon.getAddonInfo('path').decode('utf-8'))
@@ -44,7 +46,19 @@ if not cacheDir.startswith(('smb://', 'nfs://', 'upnp://', 'ftp://')) and not os
 
 if not logopath.startswith(('smb://', 'nfs://', 'upnp://', 'ftp://')) and not os.path.isdir(logopath)== 1 :
     os.mkdir(logopath)
-
+#if xbmcvfs.exists(clean_cache):
+#    if int(time.time()-os.path.getmtime(clean_cache)) >  300 :#300 is 1 month      #60*60*24*30):
+#        print 'time of creation of ff',str(time.time()-os.path.getmtime(clean_cache))
+#        import shutil
+#        shutil.rmtree(cacheDir)
+#        shutil.rmtree(logopath)
+#        #notification("Cache Cleared","old cache cleared")
+#        os.mkdir(logopath)
+#        os.mkdir(cacheDir)
+#else:
+#    with open(clean_cache,'w') as f:
+#        f.write('')
+#h = httplib2.Http(cacheDir)
 forum_url = "http://doridro.com/forum/viewforum.php?f={0}"
 xbmcplugin.setContent(handle, 'movies')
 def ensure_dir():
@@ -219,10 +233,11 @@ def down_url(url,filename=None):
     pDialog.close()
 def _login():
     if Doridro_USER == '' :
+        notification('Need Doridro.com User pass','Please register & login in the settings ::.',2000)
         return
     
 
-    if os.path.exists(cookie_jar) and (time.time()-os.path.getmtime(cookie_jar) < 60*60*24) and os.path.getsize(cookie_jar) > 5:
+    if os.path.exists(cookie_jar) and (time.time()-os.path.getmtime(cookie_jar) < 60*60*10) and os.path.getsize(cookie_jar) > 5:
         #notification('Already Logged IN','Logged In to doridro.Com as %s ::.'%Doridro_USER,2000)
         print 'Logged in for A day'
     else:
@@ -233,7 +248,7 @@ def _login():
 
         Cookie =  session.cookies.get_dict()      #str(r.headers['set-cookie'])
         #print r.cookies
-        loged_in = check_login(r.text,'alibaba011')
+        loged_in = check_login(r.text,'%s' %Doridro_USER)
         if loged_in == True:
             notification('Login Succes','Succesfully loged_in to doridro.Com as %s ::.'%Doridro_USER,2000)
             #return r.cookies
@@ -270,13 +285,30 @@ def get_soup(url,content=None,ref=None,post=None,mobile=False,data=None):
 
 
 def CATEGORIES(name):
+    itemart={}
+    item_info={}
     if not Doridro_USER == '' :
         _login()
-        addDir("Natok & Telefilms", '155',3,'','')
-        addDir("Bangla Movies", '106',3,'','')
-        addDir("Music[Download ONLY]", '166',3,'','')
-        addDir("Kolkutta Music[Download ONLY]", '192',3,'','')
-    addDir("Live TV", 'http://www.jagobd.com/category/bangla-tv',1,'','')
+        item_info["title"] = "Natok & Telefilms"
+        item_info["genre"] = "Natok"
+        
+        addDir("Natok & Telefilms", '155',3,itemart,item_info)
+        item_info["title"] = "Bangla/Bengali Movies"
+        item_info["genre"] = "Bangla/Bengali Movies"
+         
+        addDir("Bangla Movies", '106',3,itemart,item_info)
+        item_info["title"] = "Bangla/Bengali Music"
+        item_info["genre"] = "Music"
+        
+        addDir("Music[Download ONLY]", '166',3,itemart,item_info)
+        item_info["title"] = "Bangla/Bengali Music"
+        item_info["genre"] = "Bangla/Bengali Music"
+        
+        addDir("Kolkutta Music[Download ONLY]", '192',3,itemart,item_info)
+    item_info["title"] = "LiveTv"
+    item_info["genre"] = "TV"
+        
+    addDir("Live TV", 'http://www.jagobd.com/category/bangla-tv',1,itemart,item_info)
     #addDir("Drama Serials", 'http://doridro.com/forum/viewforum.php?f=99',99,'','')
 
     
@@ -375,68 +407,274 @@ def _______livetv(embed_url,ref=None):
 
 
 def removeNonAscii(s): return "".join(filter(lambda x: ord(x)<128, s))
+tabsurls= {}
+def make_colorful(name,new=False):
+    if new:
+        return "[COLOR hotpink]%s[/COLOR]" %name
+    return "[COLOR skyblue]%s[/COLOR]" %name
+    
+def natok_tabs(name,tab,url,info_source_match,allsources,img,premiered,num):
+    info=[]
+    name = cleanname(name)
+    try:
 
+        content,new = cache(url,duration=0,need_cookie='login') 
+        #allsources = re.compile(r'''class="postlink"\s*[href=]?.*?(https?://[^<"]+)''',re.DOTALL).findall(content)
+        
+        info_source_match = info_source_match.findall(content)
+        if info_source_match:
+            info_source_match = info_source_match[0]
+            img = img.findall(info_source_match)
+            if img:
+                img = [i for i in img if ("/i/" in i and not "/files/" in i) or "wikimedia.org" in i or i.endswith(".jpg")]
+            allsources = allsources.findall(info_source_match)
+            info = re.compile(r"<br />(\w+[^\n<]+)<").findall(info_source_match)
+            if not info:
+                info=[name] 
+            #info = "\n".join(info)
+            tabsurls[str(tab)] = {"url":url,"sources":allsources,"arts":img,"info":info,"name":make_colorful(name,True),"premiered":premiered,"num":num}
+        else:
+            raise
+    except Exception:
+        tabsurls[str(tab)] = {"name":name,"premiered":premiered,"num":num}
+        
+import workers
+def processthreads(threads,pDialog,timeout=10):
+        [i.start() for i in threads]
+        #timeout = timeout*2*60
+        #for i in range(0, timeout ): #timeout=3600 . then 3600*.5*1/60 = 30s
+        #    try:
+        #        if xbmc.abortRequested == True: return sys.exit()
+        #        if pDialog.iscanceled(): break
+        #    except:
+        #        pass            
+        #    pDialog.update(30,"Please Wait %s Seconds" %str(i))
+        #    is_alive = [x.is_alive() for x in threads]
+        #    if all(x == False for x in is_alive)  : break
+         #   time.sleep(0.5)
+        [i.join() for i in threads] #This will wait until all the processed return something independent of time
+def deg(string,level=xbmc.LOGNOTICE):
+        try:
+            xbmc.log("[Doridro::]: %s" %str(string),level)
+        except:
+            traceback.print_exc()
+            pass
+def checkfile(pathtofile,timeforfileinsec):
+        _time_limit = time.time() - int(timeforfileinsec)
+        if os.path.isfile(pathtofile):
+            #xbmcvfs.Stat(filename).st_mtime()
+            #xbmcvfs.File(filename).size()
+
+            if os.stat(pathtofile).st_mtime < _time_limit:
+                #xbmcvfs.delete(pathtofile)
+                return False #update        
+        if os.path.isfile(pathtofile):
+            
+            return True
+        else:
+            return False
+def getpremiered(date_reg,plot):
+    monthDict={'Jan':'01', 'Feb':'02', 'Mar':'03', 'Apr':'04', 'May':'05', 'Jun':'06',
+                        'Jul':'07', 'Aug':'08', 'Sep':'09', 'Oct':'10', 'Nov':'11', 'Dec':'12'}    
+    dateinfo = date_reg.findall(plot)
+    deg(dateinfo)
+    if dateinfo:
+        dateinfo = dateinfo[0]
+        month = dateinfo[1][:3]
+    
+        if month in monthDict:
+            month = monthDict[month]
+        else:
+            month = '01'
+    
+        premiered=  '%s-%s-%s' %(str(dateinfo[2]),month,str(dateinfo[0])) 
+    
+    else:
+        premiered = '1969-01-01'
+    return premiered    
+def createNAthread(orig_url,pDialog,doridro_source,update=False):
+            global tabsurls
+            tabsurls={}
+            threads=[]
+            info_source_match = re.compile(r'<div class="content"><div class="center-block text-center"><img (.*?)</div></div>',re.IGNORECASE | re.DOTALL)
+            img = re.compile(r'src="(https?[^"]+)"', re.IGNORECASE | re.DOTALL)
+            allsources = re.compile(r'''class="postlink"\s*[href=]?.*?[<|"](https?://[^<"]+)''',re.DOTALL)
+                         
+            if update:
+                tabsurls= json.loads(open(doridro_source).read())
+                tabsurlskeys = tabsurls.keys()
+                #remove new tag color
+                for i in tabsurls:
+                    tabsurls[i]["name"]=re.sub(r"\[.*?\]","",tabsurls[i].get("name"))
+            else:
+                tabsurlskeys={}
+            date_reg=re.compile(r"\W+(\d{2})\s*(\w+)\s*(\d{4})", re.IGNORECASE | re.DOTALL)
+            #if not update:
+            for j in range(0,300,60):
+                if not j == 0:
+                        url = orig_url+"&start="+str(j)
+                else:
+                    url = orig_url        
+                uurl = forum_url.format(url)
+                content,new = cache(uurl, duration=2)
+                print len(content)
+                soup = get_soup('',content=content)
+                #soup = get_soup(url)
+                l = soup('div' ,{'class':'desc-wrapper'})[9:70]
+                deg( "Number of titles")
+                deg( len(l))
+    
+                for index,i in enumerate(l):
+                    href=i('a' ,{'class':'topictitle'})[0]
+                    href1= href.get('href').split('&sid=')[0]
+                    name = removeNonAscii(href.text).encode('utf-8','ignore')
+                    tab= href1.replace('&amp;','&').replace('./','')
+                    url= 'http://doridro.com/forum/' + tab
+                    premiered=getpremiered(date_reg,i("small")[0].text)
+                    #natok_tabs(tab,url,info_source_match,allsources,img)
+                    if (update and not tab in tabsurlskeys) or not update:
+                        #deg(name)
+                        #deg(tab)
+                        threads.append(workers.Thread(natok_tabs, name,tab,url,info_source_match,allsources,img,premiered,str(j+index)))
+                if update:
+                    break
+            deg("#of threads")
+            deg(len(threads))    
+            if len(threads) >0 :
+                if update== False:
+                    processthreads(threads,pDialog,timeout=30)
+                else:
+                    processthreads(threads,pDialog)
+                with open(doridro_source,"w")    as f:
+                    f.write(json.dumps(tabsurls))
+            else:
+                deg("No update necessary : File unchanged")
 def natok(url):
         pDialog = xbmcgui.DialogProgress()
         pDialog.create('Getting Natok', 'Downloading Natok with image ...')
+        start=0
+        if "start" in url:
+            orig_url,start= url.split("&start=")
+        else:
+            orig_url=url
+            
         #pDialog.close()
-        uurl = forum_url.format(url)
-        content,new = cache(uurl, duration=2)
-        print len(content)
-        soup = get_soup('',content=content)
-        #soup = get_soup(url)
-        l = soup('a' ,{'class':'topictitle'})[9:70]
-        print len(l)
-        match=[]
-        count = 0
-        for i in l:
-            href1 = i.get('href').split('&sid=')[0]
-            #print href1
-            #href = re.compile(r'''(.*?)&amp;sid=''',re.DOTALL).findall(href1)
-            #print href
-            name = removeNonAscii(i.text).encode('utf-8','ignore')
-            tab= href1.replace('&amp;','&').replace('./','')
-            url= 'http://doridro.com/forum/' + tab
-            #thumb_from_folderjpg = os.path.join(logopath,name+'.JPG')
-            #thumb_from_folderpng = os.path.join(logopath,name+'.png')
-            #if addon.getSetting('metadata') == 'true' :
-                #try:
-                    #thumb_from_folder = get_thumb(name)
-                    #if os.path.isfile(thumb_from_folderjpg):
-                    #    thumb_from_folder = thumb_from_folderjpg
-                    #    #print 'thumb found from folder'
-                    #
-                    #elif os.path.isfile(thumb_from_folderpng):
-                    #    thumb_from_folder = thumb_from_folderpng
-                    #
-                    #else:
-                    #    #print ('getting image from folder using google image search')
-                    #    thumb_from_folder = google_image(name)
-                #except:
-                    #print 'No image'
-            #else:
-            #    thumb_from_folder = ''
-            thumb_from_folder = os.path.join(home,'icon.png')
-            count += 1
-            pDialog.update(int(count*1.6), 'Downloading: %s  ...' %name)
-            name = name.split(')')[0].replace('(','')
+        if orig_url == "155":
+           doridro_source=os.path.join(cacheDir,'doridro_source_natok.json')
+        elif orig_url == "106":
+           doridro_source=os.path.join(cacheDir,'doridro_source_movies.json')
+        elif orig_url == "166" or orig_url == "192":
+           doridro_source=os.path.join(cacheDir,'doridro_source_music.json')        
+        if os.path.isfile(doridro_source):
+            if not checkfile(doridro_source,24*60*60):
+                createNAthread(url,pDialog,doridro_source,update=True)
+        else:
+                createNAthread(url,pDialog,doridro_source,update=False)
+        pDialog.update(50, 'Finish the source File')
+                        
+        tabsurls= json.loads(open(doridro_source).read())
+        dated=re.compile(r"date\W+.*?(\d{4})", re.IGNORECASE | re.DOTALL)
+        tabsurls = OrderedDict((k,v)for k,v in sorted(tabsurls.items(), key=lambda k:int(k[1]["num"]),reverse=False))
+
+        for index,i in enumerate(tabsurls):
+            itemart=item_info={}
+            mode="5"
+            name= tabsurls[i]["name"]
+            
+            if tabsurls[i].get("sources"):
+                url= "|||".join(tabsurls[i]["sources"])
+            else:
+                mode="53"
+                url='plugin://plugin.video.youtube/search/?q='
+                item_info["status"]="No Source found. Play from Youtube"
+                                
+                
+            if tabsurls[i].get("arts") :
+                itemart['thumb'] = tabsurls[i]["arts"][0]
+                try:
+                    itemart['fanart']  = tabsurls[i]["arts"][1]
+                except Exception:
+                    itemart['fanart']  = itemart['thumb'] 
+            else:
+                 itemart['thumb'] =itemart['fanart']  = os.path.join(home,'icon.png')
+            
+            try:
+                plot=item_info['plot']="\n".join(tabsurls[i]["info"])
+#https://github.com/vonH/plugin.video.iplayerwww/blob/3c5e08e845cd756a9b17a66e45882fd82b90472e/resources/lib/ipwww_video.py#L181
+
+                if "Writers" in plot:
+                    director = re_me(plot,r"Writers\W+([^&]+)",flags=re.I)
+                    if "File" in director:
+                        director= director.split("File")[0]
+                    item_info['director']=  director                
+            except Exception:
+                item_info["plot"] = name
+            name = cleanname(name)
+            item_info["dateadded"] =item_info["premiered"] = tabsurls[i].get("premiered")
+            pDialog.update(int((index*50)/len(tabsurls)), 'Adding: %s  ...' %name)
+            #name = name.split(')')[0].replace('(','')
             liz=xbmcgui.ListItem(name)
-            liz.setInfo( type="Video", infoLabels={ "Title": name})
+            liz.setInfo( type="Video", infoLabels=item_info)
             #liz.setMimeType('mkv')
-            liz.setArt({ 'thumb': thumb_from_folder, 'fanart' : thumb_from_folder })
-            liz.setIconImage(thumb_from_folder)
+            liz.setArt(itemart)
             #print 'name to pass to videolinks', name
-            u = sys.argv[0] + '?mode=5' + '&url=' + urllib.quote_plus(url)\
+            u = sys.argv[0] + '?mode='+mode + '&url=' + urllib.quote_plus(url)\
                 + '&name=' + urllib.quote_plus(name)
             #print u
             xbmcplugin.addDirectoryItem(handle, u, liz, True)
-
+        pDialog.close()
+        #addDir("[COLOR yellow]Next Page > >[/COLOR]",orig_url+"&start="+str(int(start)+60),3,"","")
         #xbmcplugin.endOfDirectory(handle)
-
             #xbmcplugin.addDirectoryItem(handle=int(sys.argv[1]),url=u,listitem=liz,isFolder=True )
-def solve_fileshare_url(link):
+def cleanname(name,keepcolor=True):
+    try:
+        if keepcolor:
+            name = re.sub(r"(?!\[/?c)\[.*?\]","",name,flags=re.I)
+        else:
+            name = re.sub(r"\[.*?\]","",name)
+        name = re.sub(r"\d+\s*(mb|p)","",name,flags=re.I)
+        name = re.sub(r"mkv|hevc","",name,flags=re.I)
+        name =re.sub(r"(web|hdtv|vcd|hd|tv|dvd|scr)(\W?rip)","",name,flags=re.I)
+        name =re.sub(r"(dvd|scr|rip|hq|tv|web)","",name,flags=re.I)
+        name = re.sub(r"(\d{3,4}p)","", name,flags=re.I)
+        name = re.sub(r"(x\d{3})","", name,flags=re.I)
+        name = re.sub(r"(\d(cd|dvd))","", name,flags=re.I)
+        name = re.sub(r"\s+",r" ",name)
+        name = re.sub(r"-","",name)
 
+    except:
+        pass
+    return name
+def re_me(data, re_patten,flags=0):
+    match = ''
+    m = re.search(re_patten, data,flags=flags)
+    if m != None:
+        match = m.group(1)
+    else:
+        match = ''
+    return match
+def solve_fileshare_url(link):
+    import urlresolver
+    host = urlresolver.HostedMediaFile(link)
     extracted_url = ''
+    if host :
+        try:
+            stream_url = host.resolve()
+            if stream_url and isinstance(stream_url, basestring):
+                return stream_url
+                #xbmc.executebuiltin("XBMC.Notification(LiveStreamsPro,Urlresolver donot support this domain. - ,5000)")
+                #raise Exception()
+            elif stream_url and isinstance(stream_url,list):
+                for k in stream_url:
+                    if k['quality'] == '1080p' :
+                        return k['url']                    
+                    elif k['quality'] == 'HD'  :
+                        return k['url']
+                    elif k['quality'] == 'SD' :
+                        return k['url']
+
+        except Exception:
+            pass    
     if 'indishare' in link or 'bdupload' in link:
         extracted_url = indishare(link)
     elif 'uptobox' in link:
@@ -496,35 +734,28 @@ def getVideolinks(name,url):
     else:
         pDialog = xbmcgui.DialogProgress()
         pDialog.create('Getting Video links', 'Please wait ...')    
-    content,new = cache(url,duration=1,need_cookie='login') 
-    #allsources = re.compile(r'''class="postlink"\s*[href=]?.*?(https?://[^<"]+)''',re.DOTALL).findall(content)
-    allsources = re.compile(r'''class="postlink"\s*[href=]?.*?[<|"](https?://[^<"]+)''',re.DOTALL).findall(content)
-    #l = re.compile(r'''a\s*class="postlink"\s*href="([^"]+)''',re.DOTALL).findall(content)
-    #l = re.compile(r'''rel="nofollow"\s*onclick="this\.target='_blank';">(.*?)</a>''',re.DOTALL).findall(content)
-    #soup = BeautifulSoup(content,'html.parser')
-    #l = soup('a',{'class': 'postlink'})
-    print len(allsources)
-    print allsources
     #return
     playlist = xbmc.PlayList(xbmc.PLAYLIST_VIDEO)
     playlist.clear()
     domains = ['seenupload','uptobox','share.jong.li','indishare','uppit','bdupload']
     final_url = []
     tracks=[]
-    if len(allsources) >1:
+    allsources = [i for i in url.split("|||") if not "arabloads.net" in i]
+    
+    if len(allsources) >0:
+        
         for i in allsources:
+            if i == "YT":
+                name = re.sub(r"\[.*?\]","",name)
+                final_url.append('plugin://plugin.video.youtube/search/?q='+ urllib.quote_plus(name))
+            #elif i == "DM" :
+                
             if music :
                 import urlparse
                 d_name= '[' + urlparse.urlparse(i).netloc + '] ' +   urllib.unquote_plus(i.split('/')[-1])
-                #if d_name == '':
-                #if d_name == '':
-                #    tracks.append(name)
-                #else:
                 tracks.append(d_name)            
             elif 'share.jong.li' in i :
-                print 'share.jong.li found'
                 extracted_url = jongli(i,ref=url)
-                print extracted_url
                 if extracted_url :
                     final_url.append(extracted_url)
                 else:
@@ -532,20 +763,11 @@ def getVideolinks(name,url):
             elif not any(x in i for x in domains):
                 
                 allsources.remove(i)
-                #import urlparse
-                #
-                #
-                #d_name=urlparse.urlparse(i).netloc
-                #if d_name == '':
-                #    names.append(name)
-                #else:
-                #    names.append(d_name)
             else:
-                
                 continue
         print 'url list now:::',allsources
+        deg(final_url)
         if len(final_url) >0:
-            print final_url
             for stream in final_url:
                 if not 'rar' in stream or not 'zip' in stream:
                     info = xbmcgui.ListItem('%s' %name)
@@ -554,7 +776,7 @@ def getVideolinks(name,url):
         
         elif len(tracks) >0 :
             dialog = xbmcgui.Dialog()
-            index = dialog.select('Choose a video source', tracks)
+            index = dialog.select('Choose a Audio source', tracks)
             if index >= 0:
                 if 'share.jong.li' in tracks[index] :
                 #print 'share.jong.li found'
@@ -815,10 +1037,10 @@ def cache(url, duration=0,ref=None,post=None,body={},need_cookie=None):
         #print headers
         r = requests.get(url,headers=headers,verify=False)
         content =r.text
-
-    fh = xbmcvfs.File(cacheFile, 'w')
-    fh.write(removeNonAscii(content).encode('utf-8'))
-    fh.close()
+    if not duration == 0:
+        fh = xbmcvfs.File(cacheFile, 'w')
+        fh.write(removeNonAscii(content).encode('utf-8'))
+        fh.close()
     return content,new
 def indishare(url): #limit of 120 minutes/day
     pDialog = xbmcgui.DialogProgress()
@@ -869,13 +1091,122 @@ def notification(header="", message="", sleep=3000):
     in addition you can set the length of time it displays in milliseconds and a icon image.
     """
     xbmc.executebuiltin("XBMC.Notification(%s,%s,%i)" % ( header, message, sleep ))
-def addDir(name,url,mode,iconimage,date):
+def addDir(name,url,mode,itemart={},item_info={}):
     u=sys.argv[0]+"?url="+urllib.quote_plus(url)+"&mode="+str(mode)+"&name="+urllib.quote_plus(name)
     ok=True
-    liz=xbmcgui.ListItem(name, iconImage="DefaultFolder.png", thumbnailImage=iconimage)
-    liz.setInfo( type="Video", infoLabels={ "Title": name , "Year": date, "Genre": date} )
+    liz=xbmcgui.ListItem(name)
+    liz.setInfo( type="Video", infoLabels=item_info )
+    liz.setArt(itemart)
     ok=xbmcplugin.addDirectoryItem(handle,url=u,listitem=liz,isFolder=True)
     return ok
+def ascii(string):
+    if isinstance(string, basestring):
+        if isinstance(string, unicode):
+           string = string.encode('ascii', 'ignore')
+    return string
+def uni(string, encoding = 'utf-8'):
+    if isinstance(string, basestring):
+        if not isinstance(string, unicode):
+            string = unicode(string, encoding, 'ignore')
+    return string
+def removeNonAscii(s): return "".join(filter(lambda x: ord(x)<128, s))
+
+def sendJSON( command):
+    data = ''
+    try:
+        data = xbmc.executeJSONRPC(uni(command))
+    except UnicodeEncodeError:
+        data = xbmc.executeJSONRPC(ascii(command))
+
+    return uni(data)
+
+def pluginquerybyJSON(queryurl,method="Files.GetDirectory",give_me_result=None,addtoplaylist=False):
+    #xbmc.log("playlist: %s" %url)
+    #method = "GUI.ActivateWindow" #queryurl="plugin%3A%2F%2Fplugin.video.sastatv%2F%3Findex%3D4%26mode%3D10%26name%3DHindi%26origurl%3Dhttp%3A%2F%2Fsastatv.com%2Fsecured%2Fxml%2Flive-root.xml%26thumb%3Dhttp%3A%2F%2Fsastatv.com%2Fimages%2Flogo%2FSastaLive_hindi.jpg%26url%3Dhttp%3A%2F%2Fsastatv.com%2Fsecured%2Fphp%2FfetchLiveFeeds.php%3Fid%3De-hindi.xml"
+    if  method.startswith("GUI"):
+        if "ActivateWindow" in method:
+            json_query = uni('{"jsonrpc":"2.0","method":"GUI.ActivateWindow","id":1,"params":{"window":"videos","parameters": ["\\"%s\\""]}}') %queryurl
+        elif "ShowNotification" in method:
+            json_query = uni('{"jsonrpc":"2.0","method":"GUI.ShowNotification","params":{"title":"","message":""},"id":12}') %queryurl
+    
+    elif method == "Input.SendText" :
+        json_query = uni('{"jsonrpc":"2.0","method":"Input.SendText","params":{"text":"%s"},"id":1}') %queryurl 
+    
+    elif 'audio' in queryurl:
+        json_query = uni('{"jsonrpc":"2.0","method":"Files.GetDirectory","params": {"directory":"%s","media":"video", "properties": ["title", "album", "artist", "duration","thumbnail", "year"]}, "id": 1}') %queryurl
+    else:
+        json_query = uni('{"jsonrpc":"2.0","method":"Files.GetDirectory","params":{"directory":"%s","media":"video","properties":[ "plot","playcount","director", "genre","votes","duration","trailer","premiered","thumbnail","title","year","dateadded","fanart","rating","season","episode","studio","mpaa"]},"id":1}') %queryurl
+        
+    json_folder_detail = json.loads(sendJSON(json_query))
+    #deg(json_folder_detail)
+    if json_folder_detail.has_key('error'):
+        xbmc.executebuiltin("XBMC.Notification(BD Doridro,Plugin Json Request failed. - "+"this"+",4000,"+icon+")")
+        return    
+    if json_folder_detail["result"] == "OK":
+        return
+    else:
+        total=len(json_folder_detail['result']['files'])
+        pDialog = xbmcgui.DialogProgressBG()
+        pDialog.create("PlayList","Adding")        
+        for i in json_folder_detail['result']['files'] :
+            itemart=item_info={}
+            url = i['file']
+            name = removeNonAscii(i['label'])
+            itemart['thumb'] = removeNonAscii(i.get('thumbnail'))
+            itemart['fanart'] = removeNonAscii(i.get('fanart'))
+            item_info = dict((k,v) for k, v in i.iteritems() if not v == '0' or not v == -1 or v == '')
+            
+            if i['filetype'] == 'file':
+                    addLink(url,name,itemart,item_info,None,total)
+                    #xbmc.executebuiltin("Container.SetViewMode(500)")
+                    if i['type'] and i['type'] == 'tvshow' :
+                        xbmcplugin.setContent(int(sys.argv[1]), 'tvshows')
+                    elif i['episode'] > 0 :
+                        xbmcplugin.setContent(int(sys.argv[1]), 'episodes')
+            else:
+                #deg("dir")
+                if not "plugin://" in url:
+                    
+                    mas = re.compile(r"[&|;]url=([^&\n\r]+)",re.IGNORECASE | re.DOTALL).findall(url)
+                    url = url.replace(mas[0],urllib.quote_plus(url))
+                addDir(name,url,53,itemart,item_info)
+        pDialog.close()
+        xbmcplugin.endOfDirectory(int(sys.argv[1]))
+def addLink(url,name,itemart,item_info,regexs=None,total=1,setCookie=""):
+        #print 'url,name',url,name,iconimage
+        contextMenu =[]
+        mode="12"
+     
+        try:
+            name = name.encode('utf-8')
+        except: pass
+        ok = True
+        isFolder=False
+        u=sys.argv[0]+"?"
+        playlist = item_info.get('playlist',None)
+        u += "url="+urllib.quote_plus(url)+"&mode="+mode
+        item_info["Title"] = name
+
+        liz=xbmcgui.ListItem(name)
+        iconimage = itemart.get('thumb')
+        
+        if not iconimage:
+            iconimage=itemart['thumb'] = icon
+        try:
+            u += "&thumb="+urllib.quote_plus(iconimage)
+        except: pass
+        try:
+            u += "&plot="+ urllib.quote_plus(item_info["plot"]) 
+        except: pass
+        #u += "&iconimage="+urllib.quote_plus(iconimage)        
+        liz.setInfo(type="Video", infoLabels=item_info)
+        liz.setArt(itemart)        
+        fanart = itemart.get('fanart')           
+        #print 'adding',name
+        ok=xbmcplugin.addDirectoryItem(handle=int(sys.argv[1]),url=u,listitem=liz,totalItems=total,isFolder=isFolder)
+
+        #print 'added',name
+        return ok          
 def get_params():
         param=[]
         paramstring=sys.argv[2]
@@ -899,23 +1230,20 @@ url=None
 name=None
 mode=None
 iconimage=None
-
+genre=None
 try:
     xbmcplugin.addSortMethod(int(sys.argv[1]), xbmcplugin.SORT_METHOD_UNSORTED)
 except:
     pass
-try:
-    xbmcplugin.addSortMethod(int(sys.argv[1]), xbmcplugin.SORT_METHOD_LABEL)
-except:
-    pass
-try:
-    xbmcplugin.addSortMethod(int(sys.argv[1]), xbmcplugin.SORT_METHOD_DATE)
-except:
-    pass
-try:
-    xbmcplugin.addSortMethod(int(sys.argv[1]), xbmcplugin.SORT_METHOD_GENRE)
-except:
-    pass
+#try:
+#    xbmcplugin.addSortMethod(int(sys.argv[1]), xbmcplugin.SORT_METHOD_GENRE)
+#except:
+#    pass
+#try:
+#    xbmcplugin.addSortMethod(int(sys.argv[1]), xbmcplugin.SORT_METHOD_DATEADDED)
+#except:
+#    pass
+
 
 
 try:
@@ -940,6 +1268,11 @@ except:
         pass
 try:
         ch_fanart=urllib.unquote_plus(params["ch_fanart"])
+except:
+        pass
+
+try:
+        genre=urllib.unquote_plus(params["genre"])
 except:
         pass
 
@@ -973,13 +1306,28 @@ elif mode==7:
 #    BMovies(url)
 #    xbmcplugin.endOfDirectory(handle)
 elif mode==99:
-    print ('gettting Dramaserials')
     Dramaserials(url)
     xbmcplugin.endOfDirectory(handle)
+elif mode==53:
+    name = cleanname(name, keepcolor=False)
+    pluginquerybyJSON(url+name)
 elif mode==6:
     print ('gettting multiplelinks')
     getmultiplelinks(url)
     xbmcplugin.endOfDirectory(handle)
+elif mode==12:
+        deg(url)
+        if "plugin.video.youtube" in url:
+            xbmc.Player().play(url)
+        #if not url.startswith("plugin://plugin"):#not url.startswith("plugin://plugin.video.f4mTester") :
+            #xbmc.Player().play(url)
+            #else: 
+                #xbmcplugin.setResolvedUrl(int(sys.argv[1]), True, item)
+        
+        #else:
+    #        print 'Not setting setResolvedUrl'
+        else:
+            xbmc.executebuiltin('XBMC.RunPlugin('+url+')')    
 
 
 
