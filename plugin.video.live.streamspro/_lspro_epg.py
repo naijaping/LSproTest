@@ -1,4 +1,7 @@
 from collections import OrderedDict,Counter
+import datetime
+#from datetime import datetime, timedelta
+
 from _lspro import *
 def deg(string,level=xbmc.LOGNOTICE):
         try:
@@ -10,7 +13,7 @@ epgtimeformat2 = "%Y-%m-%d %H:%M:%S"
 epgtimeformat = "%Y%m%d%H%M%S"
 
 GUIDE={}
-now = datetime.now().replace(microsecond=0)
+now = datetime.datetime.now().replace(microsecond=0)
 import xml.etree.ElementTree
 import pyfscache
 LS_CACHE_getepgcontent = pyfscache.FSCache(xbmc.translatePath("special://temp/"),hours=10)
@@ -18,7 +21,7 @@ LS_CACHE_epginfo = pyfscache.FSCache(xbmc.translatePath("special://temp/"),minut
 
 
 def starttimeofchannel(n):
-    if  (startorstoptodatetime(sorted(GUIDE[n].keys(),reverse=True)[0])- timedelta(seconds=60*30))< now :
+    if  (startorstoptodatetime(sorted(GUIDE[n].keys(),reverse=True)[0])- datetime.timedelta(seconds=60*30))< now :
         return "1"
     return "0"
 def cleanname(title):
@@ -149,7 +152,7 @@ def epg_source_toregfile(epgxml,epgtimeformat,nowstr,epgfilewithreg):
 
            
 def startorstoptodatetime(input):
-    return datetime(*(time.strptime(input, epgtimeformat)[0:6]))           
+    return datetime.datetime(*(time.strptime(input, epgtimeformat)[0:6]))           
 def down_url(url,filename,_out=None):
     #if addon.getSetting('download_path') == '':
     #        addon.openSettings()
@@ -215,7 +218,7 @@ def epginfo(channel,epgdictfile,onedayEPG=False):
     summary = ''
     itemart={}
     item_info ={}
-    hh= [i for i in GUIDE[channel].values() if  startorstoptodatetime(i['start']) <= now + timedelta(hours = 4) and startorstoptodatetime(i['stop']) > now ]
+    hh= [i for i in GUIDE[channel].values() if  startorstoptodatetime(i['start']) <= now + datetime.timedelta(hours = 4) and startorstoptodatetime(i['stop']) > now ]
     #deg(hh)
     items_list = sorted(hh, key= lambda d: int(d["start"]))
     #deg(items_list)

@@ -10,7 +10,6 @@ import xbmcaddon
 import xbmcvfs
 import traceback
 import time
-from datetime import datetime, timedelta
 from BeautifulSoup import BeautifulStoneSoup, BeautifulSoup, BeautifulSOAP
 import urlparse
 
@@ -493,8 +492,8 @@ def getData(url,fanart, data=None,searchterm=None):
                     else:                    
                         if len(soup('epg')) > 0 or len(soup('itemepg')) > 0  :
     
-                                import _lspro_epg
-                                _lspro_epg.lspro_Epg(soup)
+                                import test_lspro_epg  
+                                test_lspro_epg.lspro_Epg(soup)
                         
                         
                         total = len(soup("item"))
