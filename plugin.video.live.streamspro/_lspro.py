@@ -9,8 +9,8 @@ import xbmcgui
 import xbmcaddon
 import xbmcvfs
 import traceback
-import cookielib,base64
-import datetime,time
+import time
+from datetime import datetime, timedelta
 from BeautifulSoup import BeautifulStoneSoup, BeautifulSoup, BeautifulSOAP
 import urlparse
 
@@ -391,14 +391,7 @@ def processPyFunction(data):
 
     return data
 
-def cacheKey(url):
-    try:
-        from hashlib import md5
-        return md5(url).hexdigest()
-    except:
-        import md5
-        return md5.new(url).hexdigest()
-   
+  
 def checkfile(epgfilewithreg,timeforfileinsec):
         _time_limit = time.time() - int(timeforfileinsec)
         if os.path.isfile(epgfilewithreg):
@@ -412,276 +405,7 @@ def checkfile(epgfilewithreg,timeforfileinsec):
             return True
         else:
             return False
-def getepgcontent(url,now,cachefor=24,filefromzip=None):
-        format = "%Y%m%d%H%M%S"
-        nowstr = now.strftime(format)
-        #nowstrplus14h =  now + datetime.timedelta(hours=14)
-        #regvalidfor = nowstrplus14h.strftime(format)
-
-        filedata = ''
-        if not xbmcvfs.exists(LivewebTVepg):
-            xbmcvfs.mkdir(LivewebTVepg)
-        # check whether zip or xml file        
-        if filefromzip:
-            addon_log("[addon.live.streamspro-%s]: %s" %('filefromzip ', str(filefromzip)),xbmc.LOGNOTICE)
-            filename = os.path.join(LivewebTVepg,cacheKey(url))
-            extracted_dir = os.path.join(LivewebTVepg,cacheKey(url)+'_extracted')#dir
-            addon_log("[addon.live.streamspro-%s]: %s" %('No extracted_dir found ', str(extracted_dir)),xbmc.LOGNOTICE)            
-       
-            epgxml = os.path.join(extracted_dir,filefromzip)
-            epgfilewithreg = os.path.join(extracted_dir,cacheKey(epgxml)+'_regfor')
-            #xbmc.log("[addon.live.streamspro-%s]: %s" %('filefromzip epgxml:', str(epgxml)),xbmc.LOGNOTICE)
-            #epgxml = extracted_dir_file            
-                        
-        else:
-            #xbmc.log("[addon.live.streamspro-%s]: %s" %(' Nofilefromzip ', str(filefromzip)),xbmc.LOGNOTICE)
-            epgfilewithreg = os.path.join(LivewebTVepg,cacheKey(url)+'_regfor')
-            if "\\" in url:
-                epgxml = url
-            else:
-                epgxml = os.path.join(LivewebTVepg,cacheKey(url))
-            
-        xbmc.log("making regfile "+ str(epgfilewithreg),xbmc.LOGNOTICE) 
-        # file is ready check cache 
-        if os.path.isfile(epgfilewithreg):
-                    filedata = open(epgfilewithreg).read()
-                    context = json.loads(filedata.encode('utf-8','ignore'))
-                    now_to_maxstop_reg = datetime.datetime(*(time.strptime(context[-1][1], format)[0:6])) - now
-                    addon_log("reg file still valid; for %s...." %str(now_to_maxstop_reg),xbmc.LOGNOTICE)
-                    if (now_to_maxstop_reg.days*24+now_to_maxstop_reg.seconds/3600) >= 2 : 
-                        xbmc.log("reg file still valid ;returning context=....",xbmc.LOGNOTICE)
-                        return context
-                    addon_log("Deleting Old EPGRegexfile; for %s...." %str(now_to_maxstop_reg),xbmc.LOGNOTICE)
-                    xbmcvfs.delete(epgfilewithreg)
-                    now_to_maxstop_inepg = datetime.datetime(*(time.strptime(context[-1][2], format)[0:6])) - now
-                    addon_log("reg file not valid but epgfile still valid; for %s...." %str(now_to_maxstop_inepg),xbmc.LOGNOTICE)
-                    addon_log("reg file not valid but epgfile still valid; for %s...." %str((now_to_maxstop_inepg.days*24+now_to_maxstop_inepg.seconds/3600)),xbmc.LOGNOTICE)
-                    
-                    if (now_to_maxstop_inepg.days*24+now_to_maxstop_inepg.seconds/3600) >= 2 : 
-                        xbmc.log("making regfile then returing context=....",xbmc.LOGNOTICE)                   
-                        return epg_source_toregfile(epgxml,format,nowstr,epgfilewithreg)
-                    xbmcvfs.delete(epgxml)                
-        if not os.path.isfile(epgxml):
-            if filefromzip:
-                down_url(url,filename,_out=extracted_dir)
-            else:
-                down_url(url,epgxml)
-            #time.sleep(0.1)        
-        if os.path.isfile(epgxml):
-            return epg_source_toregfile(epgxml,format,nowstr,epgfilewithreg)                
-
-        else:
-            xbmc.executebuiltin("XBMC.Notification(LiveStreamsPro,!!Problem downloading EPG file!! ,3000,"+icon+")")
-            return                            
-
-def epg_source_toregfile(epgxml,format,nowstr,epgfilewithreg):
-        epgfile = open(epgxml).read()
-        import heapq
-        from operator import itemgetter
-        now_24 = 24- int(nowstr[8:10]) 
-        xbmc.log(str(now_24),xbmc.LOGNOTICE)
-        if now_24 <= 3 and not now_24 == 0:
-            original_filevalidfor = (datetime.datetime(*(time.strptime(nowstr, format)[0:6])) +datetime.timedelta(hours=now_24)).strftime(format)            
-        
-            context = re.compile('programme start="(%s[0-9]{5}).*?stop="(\d+)\s+.*?channel="([^"]+)">(.*?)</programme>'%nowstr[:9],re.DOTALL).findall(epgfile) +\
-                        re.compile('programme start="(%s[0-9]{6}).*?stop="(\d+)\s+.*?channel="([^"]+)">(.*?)</programme>'%original_filevalidfor[:8],re.DOTALL).findall(epgfile)
-        else:
-            context = re.compile('programme start="(%s[0-9]{6}).*?stop="(\d+)\s+.*?channel="([^"]+)">(.*?)</programme>'%nowstr[:8],re.DOTALL).findall(epgfile)
-        updatevaliduntil = max(re.compile(r'programme start=".*?stop="(\d+)\s+.*?channel=',re.DOTALL).findall(epgfile))
-        updatevaliduntil= max([(updatevaliduntil.count(i),i) for i in heapq.nlargest(50, set(updatevaliduntil)) ],key=itemgetter(0))[1]
-        if context:
-            regvalidfor = max([context[i][0] for i in range(0,len(context)) ]) #This is start time
-            
-            #original_filevalidfor = (datetime.datetime(*(time.strptime(updatevaliduntil, format)[0:6])) - datetime.timedelta(hours=2)).strftime(format)#gotes 3 hour back
-            xbmc.log( "original_filevalidfor" ,xbmc.LOGNOTICE)
-            #xbmc.log( str (original_filevalidfor),xbmc.LOGNOTICE )
-            
-            #if original_filevalidfor < regvalidfor:
-             #   regvalidfor = original_filevalidfor            
-            if context[0][1].endswith('.com'):
-
-                    idtoch = dict(re.compile(r'''<channel\s*id="(\w\d+\.[a-z0-9\.]+)\W+[a-z]+-name>([^<]+)''', re.DOTALL ).findall(epgfile))
-                    if idtoch:
-                        context=[(start,stop,idtoch.get(ch),ot) for start,stop,ch,ot in context if idtoch.get(ch)]
-
-            context.append(("updatevaliduntil",regvalidfor,updatevaliduntil,nowstr))
-            with open(epgfilewithreg,'w') as f:
-                    f.write(json.dumps(context))
-            return context
-
-        else:
-            xbmc.executebuiltin("XBMC.Notification(LiveStreamsPro,!!Warning Bad Regex::No Epg found!! ,3000,"+icon+")")
-            return
-
-           
-            
-def down_url(url,filename,_out=None):
-    #if addon.getSetting('download_path') == '':
-    #        addon.openSettings()
-    get_file_name = url.split('/')[-1]
-    #if not filename:
-        
-    #    filename = os.path.join(addon.getSetting('download_path').encode('utf-8'),get_file_name)
-    pDialog = xbmcgui.DialogProgress()
-    #pDialog = xbmcgui.DialogProgressBG()
-    pDialog.create('Downloading ......', 'File to download: %s ...' %get_file_name)
-    size = 0
-    block_sz = 8192
-    headers = {'User-agent' : 'Mozilla/5.0 (Windows NT 6.3; WOW64; rv:38.0) Gecko/20100101 Firefox/38.0'}
-    req = urllib2.Request(url,None,headers)
-    song = urllib2.urlopen(req)
-    meta = song.info()
-    file_size = int(meta.getheaders("Content-Length")[0])
-    with open(filename, 'wb') as f:
-
-        #mime_type = 'compressed/zip'
-        while True:
-            buffer = song.read(block_sz)
-            if not buffer or pDialog.iscanceled():
-                break
-
-            size += len(buffer) 
-            f.write(buffer)
-            
-            pDialog.update(int(size * 100. / file_size),'[COLOR yellow]{0}%[/COLOR]  Done...\n{1}'.format(str(int(size * 100. / file_size)),filename.rsplit('\\',1)[0]))
-    xbmc.sleep(3) #change from 10 to 0.5
-    if open(filename).read(1024).startswith('\x50\x4b\x03\x04'):
-            import zipfile
-        #try:
-            zfile = zipfile.ZipFile(filename, 'r')
-            zfile.extractall(path=_out)
-            #xbmcvfs.delete(filename)
-        #except Exception, e:
-        #        print str(e)
-    #magic_dict = {
-    #"\x1f\x8b\x08": "gz",
-    #"\x42\x5a\x68": "bz2",
-    #"\x50\x4b\x03\x04": "zip"
-    #}
-    #data = zlib.decompress(data, zlib.MAX_WBITS + 16)
-    #f.write(data)
-    #f.close()    
-    
-    pDialog.close()
-                
-            
-                
-        
-
-            
-                
-def epginfo(context,name,now,onedayEPG=False,url=''):                            
-        #xbmc.executebuiltin("XBMC.Notification(LiveStreamsPro,epg file found. - ,5000)")
-        format = "%Y%m%d%H%M%S"
-        nowstr = now.strftime(format)
-        #context is filename
-        itemart = {}
-        item_info = {}
-        plot=[]
-        append = plot.append
-        name = name.lower().replace(' ','')
-
-        if onedayEPG:
-                    #xbmc.log('onedayEPG',xbmc.LOGNOTICE)
-                    epgsoup = BeautifulSoup(context[3])
-                    append('[COLOR yellow]  %s[/COLOR]\n' %datetime.datetime(*(time.strptime(context[0], format)[0:6])).strftime('%a'))
-                    try:
-                        dur = (int(context[1][8:10])*3600+int(context[1][10:12])*60) -\
-                            (int(context[0][8:10])*3600+int(context[0][10:12])*60)
-                        item_info['duration'] = dur
-                    except:
-                        pass                
-                    append('At [B]' +context[0][8:10]+'[/B]h'+context[0][10:12]+'m --[B]'+context[1][8:10]+'[/B]h'+context[1][10:12]+'m\n')
-                    if epgsoup('desc'):
-                        if epgsoup.desc.text.endswith('(n)'):
-                            append('[COLOR cyan][B]*%s*[/B][/COLOR]'%epgsoup.desc.text)
-                        else:
-                            append(epgsoup.desc.text)
-                    #xbmc.log('onedayEPG222',xbmc.LOGNOTICE)
-                    if epgsoup('title'):
-                        item_info['epgtitle'] = item_info['title'] = context[0][8:10]+'h : ' +epgsoup.title.text
-                    if epgsoup('icon'):
-                        addon_log("[addon.live.streamspro-%s]: %s" %('Thumb found for:', str(epgsoup.icon.text)),xbmc.LOGNOTICE)
-                        itemart['thumb']  = epgsoup.icon.get("src")
-                    elif not logo_folder == "":
-                        thumb = os.path.join(logo_folder , name+'.png') 
-                        if xbmcvfs.exists(thumb):
-                        
-                            itemart['thumb'] = thumb
-                    if epgsoup('category'):
-                        item_info['genre']  = " ".join([i.text for i in epgsoup('category')])
-                    if epgsoup('sub-title'):
-                        item_info['tagline']  = epgsoup('sub-title')[0].text
-                        
-                    if len(plot) >1:
-                        item_info['plot']  = " ".join(plot)
-                    return itemart,item_info            
-        for count,(start,stop,channel,other) in enumerate(context):
-            
-            if (channel.lower().replace(' ','') == name):
-                addon_log("[addon.live.streamspro-%s]: %s" %('EPG name match', str(name)),xbmc.LOGNOTICE)
-                if (int(nowstr) <= int(stop)) :
-                    addon_log("[addon.live.streamspro-%s]: %s" %('Time matched', str(name)),xbmc.LOGNOTICE)
-                    #try:
-                    #    stop = datetime.datetime.strptime(stop, format)
-                    #    if not len(context[count+1]) <> -1:
-                    #        nxstop = datetime.datetime.strptime(context[count+1][0],format)
-                    #except TypeError:
-                    stop =datetime.datetime(*(time.strptime(stop, format)[0:6]))
-                    try:
-                       nxstop = datetime.datetime(*(time.strptime(context[count+1][0],format)[0:6]))
-                    except Exception:
-                        nxstop = None
-                        pass
-                    if int(start[8:10]) <12 or start[8:10] == '00':
-                        append('[COLOR ff18DF18]Started At : %s[/COLOR]\n' %('[B]' +start[8:10].replace("00","12")+":"+start[10:12]+'AM' ))
-                    elif 12-int(start[8:10])==0:
-                        append('[COLOR ff18DF18]Started At : %s[/COLOR]\n' %('[B]' +'12'+":"+start[10:12]+'PM' ))
-                    else:
-                        append('[COLOR yellow]Started At : %s[/COLOR]\n' %('[B]' +start[8:10]+":"+start[10:12]+'PM' ))                         
-                    epgsoup = BeautifulSoup(other)
-                    try:
-                        dur = str(stop - now).split(':')
-                        item_info['duration'] = str(int(dur[0])*3600 + int(dur[1])*60)
-                    except:
-                        pass                
-                    if epgsoup('desc'):
-                        if epgsoup.desc.text.endswith('(n)'):
-                            append('[COLOR cyan][B]*%s*[/B][/COLOR]'%epgsoup.desc.text)
-                        else:
-                            append(epgsoup.desc.text)
-                    if epgsoup('title'):
-                        item_info['epgtitle']  = epgsoup.title.text
-                    if epgsoup('icon'):
-                        addon_log("[addon.live.streamspro-%s]: %s" %('Thumb found for:', str(epgsoup.icon.text)),xbmc.LOGNOTICE)
-                        itemart['thumb']  = epgsoup.icon.get("src")
-                    elif not logo_folder == "":
-                        thumb = os.path.join(logo_folder , name+'.png') 
-                        if xbmcvfs.exists(thumb):
-                        
-                            itemart['thumb'] = thumb
-                    if epgsoup('category'):
-                        item_info['genre']  = " ".join([i.text for i in epgsoup('category')])
-                    if epgsoup('sub-title'):
-                        item_info['tagline']  = epgsoup('sub-title')[0].text
-                        
-                    if nxstop:
-                        if (context[count+1][2].lower().replace(' ','') == name):
-                            
-                            append('[COLOR hotpink]\nUp Next:: [B]@ %s[/B]\n[/COLOR] [B]*%s*[/B]' %(str(stop)[11:16],BeautifulSoup(context[count+1][3]).title.text))
-                    try:            
-                        if (context[count+2][2].lower().replace(' ','') == name):
-                            dur = str( nxstop - now).split(':')
-                            append(  '[COLOR hotpink]\nIn:: [B]%s[/B] h [B]%s[/B] min\n[/COLOR] [B]*%s*[/B]' %(dur[0] ,dur[1],BeautifulSoup(context[count+2][3]).title.text))
-                    except Exception:
-                        pass                        
-                    #xbmc.log("[addon.live.streamspro-%s]: %s" %('EPG channel match', str(item_info)),xbmc.LOGNOTICE)
-                    if len(plot) >1:
-                        item_info['plot']  = " ".join(plot)
-                    return itemart,item_info
-  
-        return  itemart,item_info 
-
+              
 def getData(url,fanart, data=None,searchterm=None):
 
         
@@ -702,7 +426,7 @@ def getData(url,fanart, data=None,searchterm=None):
     elif "$pyFunction:" in url and not url.startswith('http'):
         if '\\'  in url:
             tmp = url.split("$pyFunction:")
-            xbmc.log(str("###$pyfunction: from link###::")+url,xbmc.LOGNOTICE)
+            #xbmc.log(str("###$pyfunction: from link###::")+url,xbmc.LOGNOTICE)
             Func_in_externallink("$pyFunction:"+tmp[1],libpyCode=tmp[0])
         else:
             Func_in_externallink(url,libpyCode)
@@ -718,9 +442,11 @@ def getData(url,fanart, data=None,searchterm=None):
             #xbmc.log("[addon.live.streamsproSearching-%s]in: %s" %(searchterm,str(url)),xbmc.LOGNOTICE)
             if searchterm:
                 allitem = soup('item')
-                items = [getItems(allitem[index], fanart) for index,i in enumerate(allitem) if i.get('title') and searchterm in i.get('title').lower().strip()]
+
                 #xbmc.log("[addon.live.streamsproSearchURL-%s]:Items found %s" %(str(url), str(len(items))),xbmc.LOGNOTICE) 
-                return            
+                items = [getItems(allitem[index], fanart) for index,i in enumerate(allitem) if i.get('title') and searchterm in i.get('title').lower().strip()]
+                xbmc.log("[addon.live.streamsproSearchURL-%s]:Items found %s" %(str(url), str(len(items))),xbmc.LOGNOTICE) 
+                return       
 
             if len(soup('channels')) > 0 and addon.getSetting('donotshowbychannels') == 'false':
                 channels = soup('channel')
@@ -744,7 +470,7 @@ def getData(url,fanart, data=None,searchterm=None):
                         itemart["thumb"]=processPyFunction(thumbnail)
                     try:
                         if not itemart.get('fanart'):
-                            if addon.getSetting('use_thumb') == "true":
+                            if use_thumb == "true":
                                 itemart["fanart"] = thumbnail
 
                     except:
@@ -761,55 +487,20 @@ def getData(url,fanart, data=None,searchterm=None):
                         #xbmc.log('There was a problem adding directory from getData(): '+name.encode('utf-8', 'ignore'),xbmc.LOGNOTICE)
                         addon_log('There was a problem adding directory from getData(): '+name.encode('utf-8', 'ignore'))
             else:
-                    addon_log("sending fanart to getItems:" + str(fanart))
-                    if len(soup('epg')) > 0:
-                        if disableepg == 'true' :
-                            map(getItems,soup('epgitem'),[fanart])
-                        else:
-                            if not xbmcvfs.exists(LivewebTVepg):
-                                xbmcvfs.mkdir(LivewebTVepg)
-                            progress = xbmcgui.DialogProgress()
-                            progress.create('Progress', 'EPGitem found')
-        
-                            #from bs4 import BeautifulSoup as BS
-                            format2 = "%Y-%m-%d %H:%M:%S"
-                            format = "%Y%m%d%H%M%S"
-                            # soup is prepared so use soup instead of re
-                            epglink = soup('epg')[0].get('tvgurl')
-                            if epglink:
-                                context = None
-                                houroffset = soup('epg')[0].get('tvgshift') or 0
-                                
-                                offset = datetime.timedelta(hours=float(houroffset))
-                                now = datetime.datetime.now().replace(microsecond=0) + offset
-                                total = len(soup('epgitem'))
-                                updateafterhour = soup('epg')[0].get('updateafterhour','24')
-                                epgfile = soup('epg')[0].get('epgfile','0')
-                                #addon_log("[addon.live.streamspro-%s]: %s" %('Getting EPGCONTENT for:', str(name)),xbmc.LOGNOTICE)
-                                if not epgfile == '0':
-                                    #xbmc.log("[addon.live.streamspro-%s]: %s" %('Getting EdddPGCONTENT for:', str(name)),xbmc.LOGNOTICE)
-                                    context = getepgcontent(epglink,now,int(updateafterhour),epgfile)
-                                else:
-                                    context = getepgcontent(epglink,now,int(updateafterhour))
-                                #xbmc.log(str( len(context)),xbmc.LOGNOTICE)                                
-                                if context:
-                                    for epgitemcount,epgitem in enumerate(soup('epgitem')):
-                                        if not epgitem.get('epgname'):
-                                            name = epgitem.title.text.decode('utf-8')
-                                        else:
-                                            name = epgitem.epgname.text.decode('utf-8')
-                                        itemart,item_info = epginfo(context,name,now)
-                                        if item_info.get('epgtitle') is not None :
-                                            item_info['tvgurl'] = urllib.quote_plus(epglink)
-                                            item_info['epgfile'] = urllib.quote_plus(epgfile)
-                                            item_info['offset']=  str(houroffset)
-                                            getItems(soup('epgitem')[epgitemcount],fanart,itemart,item_info,total=total)
-                                        else:
-                                            getItems(soup('epgitem')[epgitemcount],fanart,total=total)
-                                        progress.update( int(epgitemcount*100/total), "Getting EPG for %s.." %name, "","" )
-                                else:
-                                    map(getItems,soup('epgitem'),[fanart])
-                    map(getItems,soup('item'),[fanart])                    
+                    if disableepg == 'true' :
+                        map(getItems,soup('epgitem'),[fanart])                    
+                        map(getItems,soup('item'),[fanart])
+                    else:                    
+                        if len(soup('epg')) > 0 or len(soup('itemepg')) > 0  :
+    
+                                import _lspro_epg
+                                _lspro_epg.lspro_Epg(soup)
+                        
+                        
+                        total = len(soup("item"))
+                        if total:
+                            [getItems(soup("item")[index], fanart, total=total) for index,i in enumerate(soup("item")) if not i("itemepg")]                    
+                      
         else:
             if searchterm:
                 m3upat = re.compile(r"\s?#EXTINF:.+?,%s.*?[\n\r]+[^\r\n]+" %searchterm,  re.IGNORECASE )
@@ -856,7 +547,8 @@ def parse_m3u(data, url=None, g_name=None):
             gr_match= r'#EXTINF:(.*?)group-title="%s",(.*?)[\n\r]+([^\r\n]+)'
             match = re.compile(gr_match %re.escape(g_name)).findall(content)
         elif g_name == 'No category':
-            match = re.compile(r'#EXTINF:(.+?),(.*?)[\n\r]+([^\r\n]+)').findall(content)
+            #deg("Getting No category M3U List ")
+            match = re.compile(r'#EXTINF:(.+?),([^:]+)[\n\r]+([^\r\n]+)',re.I).findall(content)
         else:
             addon_log('No group-title found in m3u list re the country name %s' %g_name, xbmc.LOGNOTICE) 
             gr_match= r'#EXTINF:(.*?),[\s]*%s[\s]*:(.*?)[\n\r]+([^\r\n]+)'
@@ -899,6 +591,8 @@ def parse_m3u(data, url=None, g_name=None):
         plot = re_me(other,'plot=[\'"](.*?)[\'"]')
         if plot:
             item_info['plot'] = plot            
+        else:
+            item_info            
         if 'type' in other:
             mode_type = re_me(other,'type=[\'"](.*?)[\'"]')
             if mode_type == 'yt-dl':
@@ -954,9 +648,6 @@ def getSubChannelItems(name,url,fanart):
 def getItems(item,fanart,itemart={},item_info={},total=1):
 
 
-            add_playlist = addon.getSetting('add_playlist')
-            ask_playlist_items =addon.getSetting('ask_playlist_items')
-            use_thumb = addon.getSetting('use_thumb')
             parentalblock =addon.getSetting('parentalblocked')
             parentalblock= parentalblock=="true"
 
@@ -984,46 +675,7 @@ def getItems(item,fanart,itemart={},item_info={},total=1):
                 name = 'NameError'
 
 
-            try:
-                if item('itemepg') and not disableepg == 'true' :
-                    #xbmc.executebuiltin("XBMC.Notification(LiveStreamsPro,epg file found. - ,5000)")
-                    format = "%Y%m%d%H%M%S"
-                    houroffset = item('itemepg')[0].get('tvgshift') or 0
-                    offset = datetime.timedelta(hours=float(houroffset))
-                    now = datetime.datetime.now().replace(microsecond=0) + offset
-                    nowstr = now.strftime(format)
-                    if item.itemepg.get('tvgurl'):
-                    
-                        epglink=item.itemepg.get('tvgurl')
-                    else:
-                        raise
-                        
-                    #if item.epg.get('updateafterhour'):
-                    updateafterhour = item('itemepg')[0].get('updateafterhour','20')
-                    epgfile = item('itemepg')[0].get('epgfile','0')
-                    addon_log("[addon.live.streamspro-%s]: %s" %('Getting EPGCONTENT for:', str(name)),xbmc.LOGNOTICE)
-                    if not epgfile== '0':
-                        #xbmc.log("[addon.live.streamspro-%s]: %s" %('Getting EdddPGCONTENT for:', str(name)),xbmc.LOGNOTICE)
-                        context = getepgcontent(epglink,now,int(updateafterhour),epgfile)
-                    else:
-                        context = getepgcontent(epglink,now,int(updateafterhour))
-                    if context:
-                        epgname = item('itemepg')[0].get('name') or name 
-                        itemart,item_info = epginfo(context,epgname,now)
-                        if item_info.get('epgtitle') is not None:
-                            item_info['tvgurl'] = urllib.quote_plus(epglink)
-                            item_info['epgfile'] = urllib.quote_plus(epgfile) 
-                            item_info['offset'] = str(houroffset)
-                            
-                            name = name + '::'+item_info.get('epgtitle')
-                        if item.get('fanart'):
-                            itemart['fanart'] = item.get('fanart')
-                else:
-                        raise
-            except:
-            #    traceback.print_exc()
-                addon_log('No EPG for %s' %name)
-                pass
+ 
             try:
                 url = []
                 if len(item('link')) >0:
@@ -1371,7 +1023,13 @@ def get_ustream(url):
         return
     except:
         return
-
+def cacheKey(url):
+    try:
+        from hashlib import md5
+        return md5(url).hexdigest()
+    except:
+        import md5
+        return md5.new(url).hexdigest()
 def getRegexParsed(regexs, url,cookieJar=None,forCookieJarOnly=False,recursiveCall=False,cachedPages={}, rawPost=False, cookie_jar_file=None):#0,1,2 = URL, regexOnly, CookieJarOnly
         if not recursiveCall:
             regexs = eval(urllib.unquote(regexs))
@@ -2659,20 +2317,23 @@ def urlsolver(url):
     pDialog.create("Trying","Using Urlresolver")
 
     if host:
-        stream_url = host.resolve()
-        if stream_url and isinstance(stream_url, basestring):
-            return stream_url
-            
-        elif stream_url and isinstance(stream_url,list):
-            for k in stream_url:
-                quality = addon.getSetting('quality')
-                if k['quality'] == 'HD'  :
-                    return k['url']
-
-                elif k['quality'] == 'SD' :
-                    return k['url']
-                elif k['quality'] == '1080p' and addon.getSetting('1080pquality') == 'true' :
-                    return k['url']
+        try:
+            stream_url = host.resolve()
+            if stream_url and isinstance(stream_url, basestring):
+                return stream_url
+                #xbmc.executebuiltin("XBMC.Notification(LiveStreamsPro,Urlresolver donot support this domain. - ,5000)")
+                #raise Exception()
+            elif stream_url and isinstance(stream_url,list):
+                for k in stream_url:
+                    quality = addon.getSetting('quality')
+                    if k['quality'] == 'HD'  :
+                        return k['url']
+                    elif k['quality'] == 'SD' :
+                        return k['url']
+                    elif k['quality'] == '1080p' and addon.getSetting('1080pquality') == 'true' :
+                        return k['url']
+        except Exception:
+            pass
     pDialog.update(50,'[COLOR yellow]{0}[/COLOR]\nTrying Next:\n{1}'.format('Urlresolver Failed','YoutubeDL Module...'))
     try:
         YTdl = True
@@ -2698,6 +2359,8 @@ def urlsolver(url):
             for s in info.streams():
                     #try:
                         stream_url = s['xbmc_url'].encode('utf-8','ignore')
+                        itemart['thumb'] = s.get('thumbnail')
+                        itemart['info'] = s['ytdl_format'].get('description').encode('utf-8','ignore')
                         addon_log("[STREAMURL FOUND FROM YTDL-%s]: %s" %('YOUTUBEDL', str(stream_url)))
                         if '.f4m' in stream_url:
                             if re.search('''foodnetwork''',stream_url):
@@ -2826,7 +2489,7 @@ def play_playlist(name, mu_playlist,queueVideo=None,itemart={},item_info={}):
                 if played: return
             return     
         if addon.getSetting('ask_playlist_items') == 'true' and not queueVideo :
-            import urlparse
+
             names = []
             iloop=0
             for i in mu_playlist:
@@ -3854,59 +3517,8 @@ def main():
         _search(url,name)
         xbmcplugin.endOfDirectory(int(sys.argv[1]))
     elif mode==26:
-        xbmc.log("Getting EPG for one day for :%s" %name,xbmc.LOGNOTICE)
-        #xbmcgui.Window(10000).
-        #xbmcgui.Window(1000).setProperty(key, value)
-        import urlparse
-        path = xbmc.getInfoLabel('ListItem.FileNameAndPath')
-        xbmc.log(str(path),xbmc.LOGNOTICE)
-        path = dict(urlparse.parse_qsl(path.split('?',1)[1]))
-        url,tvgurl,epgfile,offset = path.get('url'),path.get('tvgurl'),path.get('epgfile'),path.get('offset')
-        now = datetime.datetime.now().replace(microsecond=0) 
-        if not offset == '0':
-            offset = datetime.timedelta(hours=float(int(offset)))
-            now = datetime.datetime.now().replace(microsecond=0) + offset            
-        if epgfile == '0':
-            epgfilewithreg = os.path.join(LivewebTVepg,cacheKey(tvgurl)+'_regfor')
-        
-        else:
-            extracted_dir = os.path.join(LivewebTVepg,cacheKey(tvgurl)+'_extracted')#dir
-            #addon_log("[addon.live.streamspro-%s]: %s" %('No extracted_dir found ', str(extracted_dir)),xbmc.LOGNOTICE)            
-       
-            epgxml = os.path.join(extracted_dir,epgfile)
-            epgfilewithreg = os.path.join(extracted_dir,cacheKey(epgxml)+'_regfor')
-        
-        #xbmc.log(str(epgfilewithreg),xbmc.LOGNOTICE)
-        #xbmc.log(str(sys.argv),xbmc.LOGNOTICE)
-        filedata = open(epgfilewithreg).read()
-        context = json.loads(filedata.encode('utf-8','ignore'))
-        #sh = [(i[0][8:],re_me(i[2],r'title.*?>([^<]+)') )for i in context if i[1].lower().replace(' ','') == name.lower().replace(' ','')]
-        sh = [i for i in context if i[2].lower().replace(' ','') == name.lower().replace(' ','')]
-        addon_log('url type: '+str(sh) + name,xbmc.LOGNOTICE)
-        
-        
-        
-        for i in range(0,len(sh)):
-                 itemart,item_info=epginfo(sh[i], name, now, onedayEPG=True)
-                 #xbmc.log(str(itemart),xbmc.LOGNOTICE)
-                 #xbmc.log(str(type(itemart)),xbmc.LOGNOTICE)
-                 #xbmc.log(str(item_info),xbmc.LOGNOTICE)
-                 #xbmc.log(str(type(item_info)),xbmc.LOGNOTICE)
-                 #if item_info.get('epgtitle') is not None :
-                 #    name = name + '\n' + item_info.get('epgtitle')
-                 addLink(url,name,itemart,item_info)        
         xbmcplugin.endOfDirectory(int(sys.argv[1]))
-        #epginfo(context, name, now, onedayEPG=True,url=url)
-
-             #else:
-             #    getItems(soup('epgitem')[epgitemcount],fanart,total=total)
-          
-        
-        #xbmc.log(str(xbmc.getInfoLabel('ListItem(%s).FolderPath' % str(3))),xbmc.LOGNOTICE)
-        #items = control.window.getProperty(self.itemProperty)
-        #items = json.loads(items)        
-        #_search(url,name)
-        #xbmcplugin.endOfDirectory(int(sys.argv[1]))        
+       
     elif mode==55:
         addon_log("enabled lock")
         parentalblockedpin =addon.getSetting('parentalblockedpin')
