@@ -12,7 +12,16 @@ import traceback
 import time
 from BeautifulSoup import BeautifulStoneSoup, BeautifulSoup, BeautifulSOAP
 import urlparse
-
+import datetime
+from collections import OrderedDict,Counter
+epgtimeformat2 = "%Y-%m-%d %H:%M:%S"
+epgtimeformat = "%Y%m%d%H%M%S"
+GUIDE={}
+now = datetime.datetime.now().replace(microsecond=0)
+import xml.etree.ElementTree
+import pyfscache
+LS_CACHE_getepgcontent = pyfscache.FSCache(xbmc.translatePath("special://temp/"),hours=10)
+LS_CACHE_epginfo = pyfscache.FSCache(xbmc.translatePath("special://temp/"),minutes=25)
 viewmode=None
 try:
     from xml.sax.saxutils import escape
@@ -173,10 +182,8 @@ def getSources():
         try:
             if os.path.exists(favorites) == True:
                 addDir('Favorites','url',4, itemart , item_info)
-            addDir('Search','search',60, itemart , item_info)
             if addon.getSetting("searchotherplugins") == "true":
                 addDir('Search Other Plugins','Search Plugins',25, itemart , item_info)
-            addDir('Filter',"xbmc.executebuiltin('Action(Filter)')",1, itemart , item_info)
 
             if os.path.exists(source_file)==True:
                 sources = json.loads(open(source_file,"r").read())
@@ -419,30 +426,21 @@ def getData(url,fanart, data=None,searchterm=None):
     #    #doEval(py_file,'','','')
     #    Func_in_externallink(url,libpyCode)
     if "###LSPRODYNAMIC###" in url:
-        #xbmc.log(str("###LLLLLLLLLLLLLSSSSSPRIDYn: from link###"),xbmc.LOGNOTICE)
-        #doEvalFunction(url,'page_data','Cookie_Jar',"",functions_dir=os.path.join(home,'resources'))
         Func_in_externallink(url,libpyCode)        
     elif "$pyFunction:" in url and not url.startswith('http'):
         if '\\'  in url:
             tmp = url.split("$pyFunction:")
-            #xbmc.log(str("###$pyfunction: from link###::")+url,xbmc.LOGNOTICE)
             Func_in_externallink("$pyFunction:"+tmp[1],libpyCode=tmp[0])
         else:
             Func_in_externallink(url,libpyCode)
-        #doEval(url.split('$pyFunction:')[1],'page_data','Cookie_Jar',"",functions_dir=os.path.join(home,'resources'))
-    elif 'xbmc.executebuiltin' in url:
-        #xbmc.executebuiltin("xbmc.executebuiltin('Action(Filter)')")
-        xbmc.executebuiltin('Action(Filter)')
     else:
         soup = getSoup(url,data)
 
         #addon_log("[addon.live.streamspro-%s]: %s" %('Failed attempt', len(soup)),xbmc.LOGNOTICE) 
         if isinstance(soup,BeautifulSOAP):
-            #xbmc.log("[addon.live.streamsproSearching-%s]in: %s" %(searchterm,str(url)),xbmc.LOGNOTICE)
             if searchterm:
                 allitem = soup('item')
 
-                #xbmc.log("[addon.live.streamsproSearchURL-%s]:Items found %s" %(str(url), str(len(items))),xbmc.LOGNOTICE) 
                 items = [getItems(allitem[index], fanart) for index,i in enumerate(allitem) if i.get('title') and searchterm in i.get('title').lower().strip()]
                 xbmc.log("[addon.live.streamsproSearchURL-%s]:Items found %s" %(str(url), str(len(items))),xbmc.LOGNOTICE) 
                 return       
@@ -491,9 +489,8 @@ def getData(url,fanart, data=None,searchterm=None):
                         map(getItems,soup('item'),[fanart])
                     else:                    
                         if len(soup('epg')) > 0 or len(soup('itemepg')) > 0  :
-    
-                                import test_lspro_epg  
-                                test_lspro_epg.lspro_Epg(soup)
+
+                                lspro_Epg(soup)
                         
                         
                         total = len(soup("item"))
@@ -508,14 +505,71 @@ def getData(url,fanart, data=None,searchterm=None):
                 xbmc.log('m3333uuuuus 0000match: %s' %str(len(match)),xbmc.LOGNOTICE)
                 return
             parse_m3u(soup,url)
+def down_url(url,filename,_out=None):
+    #if addon.getSetting('download_path') == '':
+    #        addon.openSettings()
+    get_file_name = url.split('/')[-1]
+    #if not filename:
+        
+    #    filename = os.path.join(addon.getSetting('download_path').encode('utf-8'),get_file_name)
+    pDialog = xbmcgui.DialogProgress()
+    #pDialog = xbmcgui.DialogProgressBG()
+    pDialog.create('Downloading ......', 'File to download: %s ...' %get_file_name)
+    size = 0
+    block_sz = 8192
+    headers = {'User-agent' : 'Mozilla/5.0 (Windows NT 6.3; WOW64; rv:38.0) Gecko/20100101 Firefox/38.0'}
+    req = urllib2.Request(url,None,headers)
+    song = urllib2.urlopen(req)
+    meta = song.info()
+    file_size = int(meta.getheaders("Content-Length")[0])
+    with open(filename, 'wb') as f:
+
+        #mime_type = 'compressed/zip'
+        while True:
+            buffer = song.read(block_sz)
+            if not buffer or pDialog.iscanceled():
+                break
+
+            size += len(buffer) 
+            f.write(buffer)
+            
+            pDialog.update(int(size * 100. / file_size),'[COLOR yellow]{0}%[/COLOR]  Done...\n{1}'.format(str(int(size * 100. / file_size)),filename.rsplit('\\',1)[0]))
+    xbmc.sleep(3) #change from 10 to 0.5
+    if open(filename).read(1024).startswith('\x50\x4b\x03\x04'):
+            import zipfile
+        #try:
+            zfile = zipfile.ZipFile(filename, 'r')
+            zfile.extractall(path=_out)
+            os.remove(filename)
+
+    elif open(filename).read(1024).startswith('\x1f\x8b\x08'):
+            import gzip
+        #try:
+            zfile = gzip.open(filename, 'rb')
+            content= zfile.read()
+            zfile.close()
+            with open(filename,"wb") as f:
+                f.write(content)
+    
+            #xbmcvfs.delete(filename)
+        #except Exception, e:
+        #        print str(e)
+    #magic_dict = {
+    #"\x1f\x8b\x08": "gz",
+    #"\x42\x5a\x68": "bz2",
+    #"\x50\x4b\x03\x04": "zip"
+    #}
+    #data = zlib.decompress(data, zlib.MAX_WBITS + 16)
+    #f.write(data)
+    #f.close()    
+    
+    pDialog.close()
+            
 # borrow from https://github.com/enen92/P2P-Streams-XBMC/blob/master/plugin.video.p2p-streams/resources/core/livestreams.py
 # This will not go through the getItems functions ( means you must have ready to play url, no regex)
 def parse_m3u(data, url=None, g_name=None):
     content = data.strip()
-    if url and not "://" in url:
-        play_headers = url
-    itemart ={}
-    item_info ={}
+    global itemart,item_info
     if  groupm3ulinks == 'true' and not url == None:
         if 'group-title' in content and g_name is None :
     
@@ -559,58 +613,98 @@ def parse_m3u(data, url=None, g_name=None):
     
     total = len(match)
     addon_log('tsdownloader %s' %tsdownloader, xbmc.LOGNOTICE) 
-    xbmc.log('Playheadersssssss isssss %s' % str(PLAYHEADERS), xbmc.LOGNOTICE) 
+    xbmc.log('Playheadersssssss isssss %s' % str(PLAYHEADERS), xbmc.LOGNOTICE)
+    getepg= False 
     #xbmc.log('total match %s' % str(match), xbmc.LOGNOTICE) 
-#    print 'total m3u links',total
-    for other,channel_name,stream_url in match:
-        itemart['thumb'] = m3uthumb
-        itemart['fanart'] = '' 
-        if ':' in channel_name:
-            co,_name = channel_name.split(':',1)
-            channel_name = '%s [COLOR yellow][%s][/COLOR]' %(_name,co)
-        else:
-            _name = channel_name        
-        if 'tvg-logo' in other:
-            thumbnail = re_me(other,'tvg-logo=[\'"](.*?)[\'"]')
-            if thumbnail:
-                if thumbnail.startswith('http'):
-                    itemart['thumb'] = thumbnail
+    if "tvgurl" in data:
+        
+        tvgurls = re.compile(r'#EXTM3U\s*tvgurl=[\'"](.*?)[\'"]',re.IGNORECASE).findall(content)
+        if tvgurls:
 
-        elif not logo_folder == "":
-            thumb = os.path.join(logo_folder , _name.lower().replace(' ','')+'.png') 
-            if xbmcvfs.exists(thumb):
-            
-                itemart['thumb'] = thumb            
+            loadguide = lspro_Epg(tvgurls[0])
+            if loadguide:
+                getepg = True
+       
+    # thumb stays same    
+    #m3uitems= [(m3ustream_url(stream_url,other,channel_name), m3u_iteminfo(other,channel_name))for other,channel_name,stream_url in match]
+    
+    for other,channel_name,stream_url in match:
+        stream_url=m3ustream_url(stream_url,other,channel_name)
+        channel_name,itemart,item_info = m3u_iteminfo(other,channel_name,getepg)
+        addLink(stream_url,channel_name,itemart,item_info)
+    #deg(m3uitems)
+    #[addLink(stream_url,stream_info[0],stream_info[1],stream_info[2]) for stream_url,stream_info in m3uitems if stream_url]
+
+             
+    
+def m3ustream_url(stream_url,other,channel_name):
         if stream_url.endswith('.txt') or stream_url.endswith('.m3u') or stream_url.endswith('.xml'):
             item_info['showcontext'] = 'true'
             addDir(channel_name, stream_url, 1, itemart,item_info)
-            continue
-        #if PLAYHEADERS:
-        #    stream_url = '{0}|{1}'.format(stream_url,PLAYHEADERS)        
-        plot = re_me(other,'plot=[\'"](.*?)[\'"]')
-        if plot:
-            item_info['plot'] = plot            
-        else:
-            item_info            
+            return
+          
         if 'type' in other:
             mode_type = re_me(other,'type=[\'"](.*?)[\'"]')
             if mode_type == 'yt-dl':
                 stream_url = stream_url +"&mode=18"
-            elif mode_type == 'regex':
-                url = stream_url.split('&regexs=')
-                #print url[0] getSoup(url,data=None)
-                regexs = parse_regex(getSoup('',data=url[1]))
-
-                addLink(url[0], channel_name,itemart,item_info,regexs,total)
-                continue
+               
             elif mode_type == 'ftv':
                 stream_url = 'plugin://plugin.video.F.T.V/?name='+urllib.quote(channel_name) +'&url=' +stream_url +'&mode=125&ch_fanart=na'
         elif (tsdownloader and '.ts' in stream_url) and not 'f4mTester' in stream_url:
             stream_url = 'plugin://plugin.video.f4mTester/?url='+urllib.quote_plus(stream_url)+'&amp;streamtype=TSDOWNLOADER&name='+urllib.quote(channel_name)
         elif hlsretry and '.m3u8' in stream_url and not 'f4mTester' in stream_url:
             stream_url = 'plugin://plugin.video.f4mTester/?url='+urllib.quote_plus(stream_url)+'&amp;streamtype=HLSRETRY&name='+urllib.quote(channel_name)
+        return stream_url
+def cleanname(title):
+    if title == None: return "UNKNOWN"
+    title = re.sub('&#(\d+);', '', title)
+    title = re.sub('(&#[0-9]+)([^;^0-9]+)', '\\1;\\2', title)
+    title = title.replace('&quot;', '\"').replace('&amp;', '&')
+    title = re.sub('\s', '', title.strip()).lower()
 
-        addLink(stream_url, channel_name,itemart,item_info,'',total)
+    
+    
+    return title    
+def deg(string,level=xbmc.LOGNOTICE):
+        try:
+            xbmc.log("[LSPRO::]: %s" %str(string),level)
+        except:
+            traceback.print_exc()
+            pass        
+def m3u_iteminfo(other,channel_name,getepg=False):
+        item_info = {}
+        itemart={}
+        itemart['thumb'] = m3uthumb 
+        itemart['fanart'] = ''
+        if ':' in channel_name:
+            co,_name = channel_name.split(':',1)
+            channel_name = '%s [COLOR yellow][%s][/COLOR]' %(_name,co)
+        else:
+            _name = channel_name
+        if getepg :
+            Na= cleanname(_name)
+            if Na in GUIDE.keys():
+                itemart,item_info = epginfo(Na)
+        else:
+            plot = re_me(other,'plot=[\'"](.*?)[\'"]')
+            if plot:
+                item_info['plot'] = plot
+        #if 'tvg-logo' in other:
+        thumbnail = re_me(other,'tvg-logo=[\'"](.*?)[\'"]')
+        if thumbnail:
+                if thumbnail.startswith('http'):
+                    itemart['thumb'] = thumbnail
+        elif not logo_folder == "":
+            thumbnail = os.path.join(logo_folder , _name.lower().replace(' ','')+'.png')
+         #   deg("m3uthumb") 
+         #   deg(thumbnail) 
+            if xbmcvfs.exists(thumbnail):
+                #deg("thumb found in folder")
+            
+                itemart['thumb'] = thumbnail
+        #deg("This is the thuumb in itemart:"+itemart.get("thumb"))
+        #a=tuple(channel_name,itemart,item_info)
+        return channel_name,itemart,item_info
 def getChannelItems(name,url,fanart):
         soup = getSoup(url)
         if isinstance(soup, BeautifulSOAP):
@@ -740,7 +834,7 @@ def getItems(item,fanart,itemart={},item_info={},total=1):
                     for i in item('imdb'):
                         if not i.string == None:
                             if addon.getSetting('genesisorpulsar') == '0':
-                                imdb = 'plugin://plugin.video.genesis/?action=play&imdb='+i.string
+                                imdb = 'plugin://plugin.video.exodus/?action=play&imdb='+i.string
                             else:
                                 imdb = 'plugin://plugin.video.pulsar/movie/tt'+i.string+'/play'
                             url.append(imdb)
@@ -748,10 +842,12 @@ def getItems(item,fanart,itemart={},item_info={},total=1):
                         for i in item('f4m'):
                             if not i.string == None:
                                 if '.f4m' in i.string:
-                                    f4m = 'plugin://plugin.video.f4mTester/?url='+urllib.quote_plus(i.string)+'&amp;name='+name
-                                elif '.m3u8' in i.string:
-                                    f4m = 'plugin://plugin.video.f4mTester/?url='+urllib.quote_plus(i.string)+'&amp;streamtype=HLS'+'&amp;name='+name
+                                    f4m = 'plugin://plugin.video.f4mTester/?url='+urllib.quote_plus(i.string)+'&amp;name='+urllib.quote_plus(name)
+                                elif '.m3u8' in i.string and not '.ts' in i.string:
+                                    f4m = 'plugin://plugin.video.f4mTester/?url='+urllib.quote_plus(i.string)+'&amp;streamtype=HLS&name='+urllib.quote_plus(name)
 
+                                elif ".ts" in i.string:
+                                    f4m = 'plugin://plugin.video.f4mTester/?url='+urllib.quote_plus(i.string)+'&amp;streamtype=TSDOWNLOADER&name='+urllib.quote_plus(name)
                                 else:
                                     f4m = 'plugin://plugin.video.f4mTester/?url='+urllib.quote_plus(i.string)+'&amp;streamtype=SIMPLE&amp;name='+name
                             url.append(f4m)
@@ -793,12 +889,7 @@ def getItems(item,fanart,itemart={},item_info={},total=1):
             if not itemart and not item_info:
                 itemart =  dict((art_tag.replace('thumbnail','thumb'),item(art_tag)[0].string) for art_tag in art_tags if item(art_tag) and item(art_tag)[0].string is not None)
                 item_info =  dict((art_tag.replace('info','plot'),item(art_tag)[0].string) for art_tag in info_tags if item(art_tag)and item(art_tag)[0].string is not None)
-                if not itemart.get('thumb'):
-                    if not logo_folder == '' :
-                        thumb = os.path.join(logo_folder , name.lower().replace(' ','')+'.png') 
-                        if xbmcvfs.exists(thumb):
-            
-                            itemart['thumb'] = thumb            
+          
             thumbnail = itemart.get("thumb")
 
             if not thumbnail and  len(item("thumbnail")) >0: #overwrite epg thumb if <thumbnail>
@@ -808,7 +899,12 @@ def getItems(item,fanart,itemart={},item_info={},total=1):
                         thumbnail=processPyFunction(thumbnail)
                     itemart['thumb'] = thumbnail 
                 except:
-                    pass 
+                    pass
+            elif not logo_folder == "":
+                thumb = os.path.join(logo_folder , name.lower().replace(' ','')+'.png') 
+                if xbmcvfs.exists(thumb):
+            
+                    itemart['thumb'] = thumb                     
             if not itemart.get("fanart"):
                 try:
                     itemart['fanart'] = item('fanart')[0].string
@@ -819,17 +915,7 @@ def getItems(item,fanart,itemart={},item_info={},total=1):
                         itemart["fanart"] = thumbnail #thumbAsFanart                                
             if not item_info.get("plot"):
                 item_info["plot"] = name
-            if thumbnail and len(thumbnail)>0 and thumbnail.startswith('$pyFunction:'):                
-                itemart["thumb"]=processPyFunction(thumbnail)
             item_info['showcontext'] = 'true'
-            try:
-
-                if not itemart.get('fanart'):
-                    if addon.getSetting('use_thumb') == "true":
-                        itemart["fanart"] = thumbnail
-            except:
-                itemart["fanart"] = fanart
-            item_info['showcontext'] = 'true'                
             regexs = None
             if item('regex'):
                 try:
@@ -2785,8 +2871,11 @@ def pluginquerybyJSON(url,give_me_result=None,addtoplaylist=False):
         if not addtoplaylist:
             xbmcplugin.endOfDirectory(int(sys.argv[1]))                
 
-def addLink(url,name,itemart,item_info,regexs=None,total=1,setCookie=""):
+def addLink(url,name,itemart={},item_info={},regexs=None,total=1,setCookie=""):
         #print 'url,name',url,name,iconimage
+        #deg(map(str, (type(url),type(name),type(itemart),type(item_info))))
+        if not url:
+            return
         contextMenu =[]
         parentalblock =addon.getSetting('parentalblocked')
         parentalblock= parentalblock=="true"
@@ -3120,6 +3209,266 @@ def search_lspro_source(source=None,searchterm="") :
     
     xbmcplugin.endOfDirectory(int(sys.argv[1]))
 
+
+def starttimeofchannel(n):
+    if  (startorstoptodatetime(sorted(GUIDE[n].keys(),reverse=True)[0])- datetime.timedelta(seconds=60*30))< now :
+        return "1"
+    return "0"
+
+def checkfile(epgfilewithreg,timeforfileinsec):
+        _time_limit = time.time() - int(timeforfileinsec)
+        if os.path.isfile(epgfilewithreg):
+            #xbmcvfs.Stat(filename).st_mtime()
+            #xbmcvfs.File(filename).size()
+
+            if os.stat(epgfilewithreg).st_mtime < _time_limit:
+                xbmcvfs.delete(epgfilewithreg)        
+        if os.path.isfile(epgfilewithreg):
+            
+            return True
+        else:
+            return False
+#@LS_CACHE_getepgcontent
+def getepgcontent(epg,getnew=False):
+    if epg and isinstance(epg, basestring):
+        url=epglink=epg
+        epgfile = "0"
+    else:
+        epglink= epg.get('tvgurl')
+        deg(epglink)
+        url=epglink
+        if epglink:
+            epgfile = epg.get('epgfile','0')
+            houroffset = epg.get('tvgshift') or 0
+            updateafterhour = epg.get('updateafterhour','24')
+            deg(epgfile) 
+            nowstr = now.strftime(epgtimeformat)
+        
+    filedata = ''
+
+    if not xbmcvfs.exists(LivewebTVepg):
+        xbmcvfs.mkdir(LivewebTVepg)
+    # check whether zip or xml file        
+    if not epgfile == "0":
+        filename = os.path.join(LivewebTVepg,cacheKey(url))
+        extracted_dir = os.path.join(LivewebTVepg,cacheKey(url)+'_extracted')#dir
+        #addon_log("[addon.live.streamspro-%s]: %s" %('No extracted_dir found ', str(extracted_dir)),xbmc.LOGNOTICE)            
+    
+        epgxml = os.path.join(extracted_dir,epgfile)
+        epgfilewithreg = os.path.join(extracted_dir,cacheKey(epgxml)+'.json')
+    
+                    
+    else:
+        #xbmc.log("[addon.live.streamspro-%s]: %s" %(' Nofilefromzip ', str(filefromzip)),xbmc.LOGNOTICE)
+        epgfilewithreg = os.path.join(LivewebTVepg,cacheKey(url)+'.json')
+        if "\\" in url:
+            epgxml = url
+        else:
+            epgxml = os.path.join(LivewebTVepg,cacheKey(url))
+        
+    deg("making regfile "+ str(epgfilewithreg))
+    if getnew:
+        os.remove(epgfilewithreg)
+    if os.path.isfile(epgfilewithreg):
+        return epgfilewithreg
+    elif not "\\" in url:
+        if not epgfile == "0":
+            down_url(url,filename,_out=extracted_dir)
+        else:
+            down_url(url,epgxml)        
+    # file is ready check cache 
+    return epg_source_toregfile(epgxml,epgtimeformat,nowstr,epgfilewithreg)
+
+#@LS_CACHE_EPGcontent
+'''  <programme start="20170111010000 -0500" stop="20170111020000 -0500" channel="GLOBAL VANCOUVER">
+    <title lang="en">Chicago Fire</title>
+    <useless-title lang="en">The People We Meet</useless-title>
+    <desc lang="en">The People We Meet    Episode: S05E10  2017 TV-14  
+Drama | Action.
+Severide agrees to a bone marrow donation; Casey and Dawson attempt to find harmony at home; Otis and Mouch plan to create a PSA to encourage people to join the Chicago Fire Department. Severide agrees to a bone marrow donation; Casey and Dawson attempt to find harmony at home; Otis and Mouch plan to create a PSA to encourage people to join the Chicago Fire Department.
+</desc>
+    <category lang="en">Drama</category>
+    <category lang="en">Action</category>
+    <episode-num system="common">S05E10</episode-num>
+  </programme>'''
+def epg_source_toregfile(epgxml,epgtimeformat,nowstr,epgfilewithreg):
+    epgfile = open(epgxml,"rb").read()
+    if epgfile != None:
+        try:
+            root = xml.etree.ElementTree.fromstring(epgfile)
+        except:
+            root = None
+        if root is not None:
+            for programme in root.findall("./programme"):
+                subtitle=desc=""
+                channel = L.cleanname(programme.get('channel')) #clenname in here.(nospace,lower)
+                start = programme.get('start')[:14]
+                stop = programme.get('stop')[:14]
+                title = programme.find('title').text
+                if not programme.find('sub-title') is None:
+                    subtitle = programme.find('sub-title').text
+                if not programme.find('desc') is None:
+                    desc = programme.find('desc').text
+                try:
+                    category = programme.find('category').text
+                except:
+                    category = "Lspro"
+                    pass
+                try:
+                    episodenum = programme.find('episode-num').text
+                except:
+                    episodenum = '0'
+                    pass
+
+                item = {"episodenum": episodenum,"genre":category,'start': start, 'stop': stop, 'title': title,"subtitle":subtitle,"plot":desc}
+                GUIDE.setdefault(channel, {})[start] = item
+            GUIDE["FileKEY"] = epgfilewithreg
+            with open(epgfilewithreg,"w") as f:
+                f.write(json.dumps(GUIDE))
+            os.remove(epgxml)
+            return epgfilewithreg
+
+        else:
+            xbmc.executebuiltin("XBMC.Notification(LiveStreamsPro,!!Warning Bad Regex::No Epg found!! ,3000,"+icon+")")
+    
+    return None
+
+           
+def startorstoptodatetime(input):
+    return datetime.datetime(*(time.strptime(input, epgtimeformat)[0:6]))           
+def down_url(url,filename,_out=None):
+    #if addon.getSetting('download_path') == '':
+    #        addon.openSettings()
+    get_file_name = url.split('/')[-1]
+    #if not filename:
+        
+    #    filename = os.path.join(addon.getSetting('download_path').encode('utf-8'),get_file_name)
+    pDialog = xbmcgui.DialogProgress()
+    #pDialog = xbmcgui.DialogProgressBG()
+    pDialog.create('Downloading ......', 'File to download: %s ...' %get_file_name)
+    size = 0
+    block_sz = 8192
+    headers = {'User-agent' : 'Mozilla/5.0 (Windows NT 6.3; WOW64; rv:38.0) Gecko/20100101 Firefox/38.0'}
+    req = urllib2.Request(url,None,headers)
+    song = urllib2.urlopen(req)
+    meta = song.info()
+    file_size = int(meta.getheaders("Content-Length")[0])
+    with open(filename, 'wb') as f:
+
+        #mime_type = 'compressed/zip'
+        while True:
+            buffer = song.read(block_sz)
+            if not buffer or pDialog.iscanceled():
+                break
+
+            size += len(buffer) 
+            f.write(buffer)
+            
+            pDialog.update(int(size * 100. / file_size),'[COLOR yellow]{0}%[/COLOR]  Done...\n{1}'.format(str(int(size * 100. / file_size)),filename.rsplit('\\',1)[0]))
+    xbmc.sleep(3) #change from 10 to 0.5
+    if open(filename).read(1024).startswith('\x50\x4b\x03\x04'):
+            import zipfile
+        #try:
+            zfile = zipfile.ZipFile(filename, 'r')
+            zfile.extractall(path=_out)
+            os.remove(filename)
+
+    elif open(filename).read(1024).startswith('\x1f\x8b\x08'):
+            import gzip
+        #try:
+            zfile = gzip.open(filename, 'rb')
+            content= zfile.read()
+            zfile.close()
+            with open(filename,"wb") as f:
+                f.write(content)
+    
+            #xbmcvfs.delete(filename)
+        #except Exception, e:
+        #        print str(e)
+    #magic_dict = {
+    #"\x1f\x8b\x08": "gz",
+    #"\x42\x5a\x68": "bz2",
+    #"\x50\x4b\x03\x04": "zip"
+    #}
+    #data = zlib.decompress(data, zlib.MAX_WBITS + 16)
+    #f.write(data)
+    #f.close()    
+    
+    pDialog.close()
+                
+@LS_CACHE_epginfo                
+def epginfo(channel,onedayEPG=False):                            
+    summary = ''
+    itemart={}
+    item_info ={}
+    deg(GUIDE.keys())
+    hh= [i for i in GUIDE[channel].values() if  startorstoptodatetime(i['start']) <= now + datetime.timedelta(hours = 4) and startorstoptodatetime(i['stop']) > now ]
+    #deg(hh)
+    items_list = sorted(hh, key= lambda d: int(d["start"]))
+    #deg(items_list)
+    #items_list = GUIDE[channel].values()
+    #print items_list
+    for index,item in enumerate(items_list):
+        start = startorstoptodatetime(item['start'])
+      
+        if index == 0:
+            #try:
+            #python 2.7 only
+            item_info['duration'] = int((startorstoptodatetime(item['stop'])-start).total_seconds())
+            summary ='\n[COLOR yellow]' + start.strftime('%H:%M') + ' [/COLOR][COLOR cyan][B]' + item['title']+ ":" +item['subtitle'] + '\n' + item['plot'] + "[/B][/COLOR]"
+            continue
+        summary = summary + '\n[COLOR skyblue]' + start.strftime('%H:%M') + ' ' + item['title']+ "[/COLOR]:" +item['subtitle'] + '\n' + item['plot']
+    item_info['plot'] = summary
+    
+    return itemart,item_info
+
+    
+def lspro_Epg(soup):
+    deg("convert xml to dict")
+    global GUIDE
+    if isinstance(soup,basestring):
+        #try:
+            epgdictfile= getepgcontent(soup)
+        #except:
+            #epgdictfile=None
+            GUIDE = json.loads(open(epgdictfile).read())
+            return epgdictfile
+    else:
+        E=  list(set(soup("epg")+soup("itemepg")))
+        F = soup("item") + soup("epgitem")
+
+        total = len(F)    
+        names = [(index,cleanname(i.title.text.decode('utf-8'))) for index,i in enumerate(F)]
+    #deg(names)
+    
+    for index,E_con in enumerate(E):
+        epgdictfile= getepgcontent(E_con)
+        GUIDE = json.loads(open(epgdictfile).read())
+        deg("Readin file%s : %s" %(epgdictfile,str(index)))
+        epgnames=[]
+        guidekeys = GUIDE.keys()
+        EE=[(starttimeofchannel(name[1]),epgnames.append(name),names.remove(name)) for name in sorted(names,reverse=True)  if  name[1] in guidekeys]
+        failcount= Counter(elem[0] for elem in EE).get("1") or 0
+        if epgnames and int(failcount*100/len(epgnames)) > 45:
+            deg("EPG File update necessary")
+            #deg(epgnames)
+            deg(failcount)
+            
+            epgdictfile= getepgcontent(E_con,getnew=True)
+            
+        #deg(GUIDE.keys())
+   
+        itemsartinfo =  [(epgitemcount,epginfo(name)) for epgitemcount,name in epgnames]
+        #deg(itemsartinfo)
+        
+        [getItems(F[epgitemcount],FANART,epgiteminfo[0],epgiteminfo[1],total=total) for epgitemcount,epgiteminfo in itemsartinfo]
+        #names = [(epgitemcount,epginfo(name,epgdictfile)) for epgitemcount,name in epgnames]
+    
+        GUIDE={}
+        
+    if len(names) > 0:
+        [getItems(F[epgitemcount],FANART) for epgitemcount,i in names ]
+    
 def main():
   
     #itemart['thumb'] = icon
