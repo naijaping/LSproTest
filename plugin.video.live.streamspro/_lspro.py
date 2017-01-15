@@ -2901,7 +2901,10 @@ def pluginquerybyJSON(queryurl,give_me_result=None,addtoplaylist=False):
         for index,i in enumerate(json_folder_detail['result']['files']) :
             meta ={}
             url = i['file']
-            name = removeNonAscii(i['label'])
+            try:
+                name = i['label'] # support non-english
+            except:
+                name = removeNonAscii(i['label'])
             itemart['thumb'] = removeNonAscii(i.get('thumbnail',icon))
             itemart['fanart'] = removeNonAscii(i.get('fanart',FANART))
             item_info = dict((k,v) for k, v in i.iteritems() if not v == '0' or not v == -1 or v == '')
