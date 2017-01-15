@@ -665,11 +665,9 @@ def parse_m3u(data, url=None, g_name=None):
             match = re.compile(r"^[\s]*#EXTINF(((?!group-title=).)*),(.*?)[\n\r]+([^\r\n]+)",re.IGNORECASE|re.MULTILINE).findall(content)
             match =  [(other,channel_name,stream_url) for other,o,channel_name,stream_url in match]
         elif 'group-title' in content:
-            deg("getting group-title:%s" %g_name)
             
             gr_match= r'#EXTINF:(.*?group-title="%s".*?),(.*?)[\n\r]+([^\r\n]+)'
             match = re.compile(gr_match %re.escape(g_name)).findall(content)
-            deg(match)
         elif g_name == 'No category':
             
             match = re.compile(r'#EXTINF:(.+?),([^:]+)[\n\r]+([^\r\n]+)',re.I).findall(content)
@@ -679,7 +677,6 @@ def parse_m3u(data, url=None, g_name=None):
             match = re.compile(gr_match %re.escape(g_name)).findall(content)            
     else:
         match = re.compile(r'#EXTINF:(.+?),(.*?)[\n\r]+([^\r\n]+)',re.IGNORECASE).findall(content)
-    deg("parseeee")
     #deg(match)
     m3uepgfileorurl=addon.getSetting("m3uepgfileorurl")
     total = len(match)
@@ -2881,12 +2878,12 @@ def sendJSON( command):
 
     return uni(data)
 
-def pluginquerybyJSON(url,give_me_result=None,addtoplaylist=False):
+def pluginquerybyJSON(queryurl,give_me_result=None,addtoplaylist=False):
     #xbmc.log("playlist: %s" %url)
-    if 'audio' in url:
-        json_query = uni('{"jsonrpc":"2.0","method":"Files.GetDirectory","params": {"directory":"%s","media":"video", "properties": ["title", "album", "artist", "duration","thumbnail", "year"]}, "id": 1}') %url
+    if 'audio' in queryurl:
+        json_query = uni('{"jsonrpc":"2.0","method":"Files.GetDirectory","params": {"directory":"%s","media":"video", "properties": ["title", "album", "artist", "duration","thumbnail", "year"]}, "id": 1}') %queryurl
     else:
-        json_query = uni('{"jsonrpc":"2.0","method":"Files.GetDirectory","params":{"directory":"%s","media":"video","properties":[ "plot","playcount","director", "genre","votes","duration","trailer","premiered","thumbnail","title","year","dateadded","fanart","rating","season","episode","studio","mpaa"]},"id":1}') %url
+        json_query = uni('{"jsonrpc":"2.0","method":"Files.GetDirectory","params":{"directory":"%s","media":"video","properties":[ "plot","playcount","director", "genre","votes","duration","trailer","premiered","thumbnail","title","year","dateadded","fanart","rating","season","episode","studio","mpaa"]},"id":1}') %queryurl
     json_folder_detail = json.loads(sendJSON(json_query))
     #print json_folder_detail
     if give_me_result:
@@ -2932,8 +2929,12 @@ def pluginquerybyJSON(url,give_me_result=None,addtoplaylist=False):
             elif url.startswith("plugin://") :
                 addDir(name,url,53,itemart,item_info)
             else:
+                if not "plugin://" in url:
+                    
+                    mas = re.compile(r"[&|;]url=([^&\n\r]+)",re.IGNORECASE | re.DOTALL).findall(queryurl)
+                    url = queryurl.replace(mas[0],urllib.quote_plus(url))
                 item_info["showcontext"] = 'source'
-                addDir(name,url,1,itemart,item_info)
+                addDir(name,url,53,itemart,item_info)
         pDialog.close()
         if not addtoplaylist:
             xbmcplugin.endOfDirectory(int(sys.argv[1]))                
