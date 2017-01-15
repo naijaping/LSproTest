@@ -630,7 +630,12 @@ def down_url(url,filename=None,_out=None):
     
             
 # borrow from https://github.com/enen92/P2P-Streams-XBMC/blob/master/plugin.video.p2p-streams/resources/core/livestreams.py
-
+def deg(string,level=xbmc.LOGNOTICE):
+        try:
+            xbmc.log("[LSPRO::]: %s" %str(string),level)
+        except:
+            traceback.print_exc()
+            pass
 def parse_m3u(data, url=None, g_name=None):
     content = data.strip()
     global itemart,item_info
@@ -660,8 +665,11 @@ def parse_m3u(data, url=None, g_name=None):
             match = re.compile(r"^[\s]*#EXTINF(((?!group-title=).)*),(.*?)[\n\r]+([^\r\n]+)",re.IGNORECASE|re.MULTILINE).findall(content)
             match =  [(other,channel_name,stream_url) for other,o,channel_name,stream_url in match]
         elif 'group-title' in content:
-            gr_match= r'#EXTINF:(.*?)group-title="%s",(.*?)[\n\r]+([^\r\n]+)'
+            deg("getting group-title:%s" %g_name)
+            
+            gr_match= r'#EXTINF:(.*?group-title="%s".*?),(.*?)[\n\r]+([^\r\n]+)'
             match = re.compile(gr_match %re.escape(g_name)).findall(content)
+            deg(match)
         elif g_name == 'No category':
             
             match = re.compile(r'#EXTINF:(.+?),([^:]+)[\n\r]+([^\r\n]+)',re.I).findall(content)
@@ -671,8 +679,8 @@ def parse_m3u(data, url=None, g_name=None):
             match = re.compile(gr_match %re.escape(g_name)).findall(content)            
     else:
         match = re.compile(r'#EXTINF:(.+?),(.*?)[\n\r]+([^\r\n]+)',re.IGNORECASE).findall(content)
-
-    
+    deg("parseeee")
+    #deg(match)
     m3uepgfileorurl=addon.getSetting("m3uepgfileorurl")
     total = len(match)
     addon_log('tsdownloader %s' %tsdownloader, xbmc.LOGNOTICE) 
