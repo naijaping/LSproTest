@@ -3,10 +3,10 @@
     <setting id="save_location" type="folder"  label="Select a download location." default=""/>
     <setting id="use_thumb" type="bool" label="Use Thumbnails as Fanart" default="false" />
     <setting id="add_playlist" type="bool" label="Add items with multiple links as play lists" default="false"/>
-    <setting id="ask_playlist_items" type="bool" label="Ask playlist items to choose from dialog" default="false" />
+    <setting id="ask_playlist_items" type="bool" visible= "eq(-1,true)"   label="     -Ask playlist items to choose from dialog" default="false" />
     <setting id="debug" type="bool" label="Enable Add-on Debugging" default="false"/>
     <setting id="1080pquality" label="Play 1080p video ON demand if available (Not live)" type="bool" default=""/>
-    <setting id="genesisorpulsar" type="enum" values="Genesis|Pulsar" label="Play IMDBid with:" default="Genesis"/>
+    <setting id="genesisorpulsar" type="enum" values="Exodus|Pulsar" label="Play IMDBid with:" default="Exodus"/>
     <setting id="donotshowbychannels" label="Do Not show items under channel name" type="bool" default="false"/>
     
     <setting id="parentalblockedpin" label="Parental Block Pin" type="text"  option="hidden"  default=""/>
@@ -14,11 +14,15 @@
     
   </category>
   <category label="Add Source">
-    <setting id="choose_source" type="enum" values="Choose File|Enter URL" label="Choose Source Type" default=""/>
+    <setting id="choose_source" type="enum" values="Choose File|Enter URL|DropboxFolder" label="Choose Source Type" default=""/>
     <setting id="new_file_source" type="file" source="files" label="Choose File" default="" visible="eq(-1,0)"/>
     <setting id="new_url_source" type="text" label="Add URL" default="" visible="eq(-2,1)"/>
+    <setting id="dropboxfolder" type="text" label="Add Dropbox Shared Folder(You need ?dl=1 instead of ?dl=0) " default="" visible="eq(-3,2)"/>
+    <setting id="source_thumb" type="text" label="Source Thumb URL" default="" />
+    <setting id="source_fanart" type="text" label="Source Fanart URL" default="" />
     <setting type="sep" />
     <setting type="action" label="Add Source" option="close" action="RunPlugin(plugin://plugin.video.live.streamspro/?mode=7)" />
+    
     <setting type="sep" />
     <setting id="searchotherplugins" label="Search Other plugins" type="bool" default="false"/>
   </category>
@@ -26,11 +30,14 @@
   <category label="EPG/.TS/HLS">
     <setting id="logo_folderPath" type="folder"  label="Select Directory for logo.Match LogoFile with Title" default=""/>    
     <setting id="groupm3ulinks" type="bool"  label="Group Channel for m3u links by Country" default="false"/>
+    <setting id="alwaysfindepg" type="bool"  label="Always look for EPG for m3u" default="false"/>
+    <setting id="m3uepgfileorurl" type="text" visible= "eq(-1,true)"   label="   Enter EPG url or file:" default="" />
   
     <setting id="disableepg" label="Disable EPG" type="bool" default="false"/>
     <setting id="gmtfrom" type="text" label="GMT" default="5" />  
-    <setting id="tsdownloader" label="Enable this if you get trouble playing m3u" type="bool" default="false"/>
-    <setting id="hlsretry" label="Enable this if you get trouble playing m3u8 file" type="bool" default="false"/>
+    <setting id="has.f4mtester" type="bool" label="Need F4mTester Addon" default="false" enable="System.HasAddon(plugin.video.f4mTester)" />    
+    <setting id="tsdownloader" label="Play .ts file with F4mTester automatically" type="bool" visible= "eq(-1,true)" default="false"/>
+    <setting id="hlsretry" label="Try HLS stream multiple times" visible= "eq(-2,true)" type="bool" default="false"/>
     
    </category>
   <category label="Community Files">
