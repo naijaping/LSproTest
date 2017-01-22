@@ -3661,29 +3661,21 @@ def CheckEPGtimeValidaty(E_con,itemsname):
         GUIDE = json.loads(open(epgdictfile).read())
         guidekeys = GUIDE.keys()
         
-        
         FF=[]
         nameinepgfile=[]
         for name in sorted(itemsname,reverse=True):
-            
             if  name[1] in guidekeys:
                 nameinepgfile.append(name)
                 itemsname.remove(name)
                 FF.append(starttimeofchannel(name[1]))
                 
-                
-        
         #EE=[(starttimeofchannel(name[1]),nameinepgfile.append(name),itemsname.remove(name)) for name in sorted(itemsname,reverse=True)  if  name[1] in guidekeys]
         failcount= Counter(elem for elem in FF).get("1") or 0
         if nameinepgfile and int(failcount*100/len(nameinepgfile)) > 45:
-            
-            #
-            
             getepgcontent(E_con,getnew=True)
         return itemsname,nameinepgfile
 def lspro_Epg(soup):
-    
-    
+   
     pDialog = xbmcgui.DialogProgress()
     pDialog.create("Getting EPG","Please Wait" )
     global GUIDE
@@ -3700,9 +3692,10 @@ def lspro_Epg(soup):
 
         total = len(F)    
         names = [(index,cleanname(i.title.text.decode('utf-8'))) for index,i in enumerate(F)]
+    pDialog.update(10, "Total names found : %s" %str(len(names))) 
     for index,E_con in enumerate(E):
         names,epgnames=CheckEPGtimeValidaty(E_con,names)
-        pDialog.update(int(index*100./total), "Listing items with epg" )
+        pDialog.update(int(len(epgnames)*100./total), "Listing items with epg" )
         itemsartinfo =  [(epgitemcount,epginfo(name)) for epgitemcount,name in epgnames]
         
         [getItems(F[epgitemcount],FANART,epgiteminfo[0],epgiteminfo[1],total=total) for epgitemcount,epgiteminfo in itemsartinfo]
