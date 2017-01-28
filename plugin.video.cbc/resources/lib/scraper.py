@@ -70,7 +70,7 @@ class myAddon(t1mAddon):
             continue
         title =  item.title.text.encode("utf-8","ignore")
         infoList['genre'] = item.get('category') or item.get('clearleap:itemtype')
-        xbmc.log("cbc:title:%s" %title,xbmc.LOGNOTICE)
+        #xbmc.log("cbc:title:%s" %title,#xbmc.logNOTICE)
         link2=link2.text.encode("utf-8","ignore")
         if title == 'Search':
             link2=link2.replace("search","suggest") + "?max=40&offset=0&query="
@@ -152,7 +152,7 @@ class myAddon(t1mAddon):
                 guid = item.guid.text
             else:
                 
-                xbmc.log("No guid found for :%s" %title, level=xbmc.LOGNOTICE)
+                #xbmc.log("No guid found for :%s" %title, level=#xbmc.logNOTICE)
                 continue
             nxurl = "%s%s" %('https://api-cbc.cloud.clearleap.com/cloffice/client/web/browse/',guid)
             thumb = item("media:thumbnail",attrs={"profile":"CBC-HERO-3X"})
@@ -291,17 +291,17 @@ class myAddon(t1mAddon):
         body = """<device><type>web</type></device>"""
         headers={"User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 8_3 like Mac OS X) AppleWebKit/600.1.4 (KHTML, like Gecko) Version/8.0 Mobile/12F70 Safari/600.1.4","Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8","Accept-Language": "en-GB,en;q=0.5","Accept-Encoding": "gzip, deflate, br","Content-Type": "application/xml","Referer": "http://watch.cbc.ca/the-nature-of-things/season-54/episode-9/38e815a-00918982176"}
         responseText = self.getRequest("https://api-cbc.cloud.clearleap.com/cloffice/client/device/register",udata=body,headers=headers,dopost=True)
-        xbmc.log("[addon.live.cbcplayertest-%s]: %s" %('responseText', str(responseText)),xbmc.LOGNOTICE)
+        #xbmc.log("[addon.live.cbcplayertest-%s]: %s" %('responseText', str(responseText)),#xbmc.logNOTICE)
 
         try:
             deviceId = re.compile(r'<deviceId>(.+?)<',re.DOTALL).findall(responseText)[0]
-            xbmc.log("[addon.live.cbcplayertest-%s]: %s" %('', str(deviceId)),xbmc.LOGNOTICE)
+            #xbmc.log("[addon.live.cbcplayertest-%s]: %s" %('', str(deviceId)),#xbmc.logNOTICE)
             deviceToken = re.compile(r'<deviceToken>(.+?)<',re.DOTALL).findall(responseText)[0]
-            xbmc.log("[addon.live.cbcplayertest-%s]: %s" %('', str(deviceToken)),xbmc.LOGNOTICE)
+            #xbmc.log("[addon.live.cbcplayertest-%s]: %s" %('', str(deviceToken)),#xbmc.logNOTICE)
             with open(tokenfile, 'w') as outfile: #SAVE TOKEN FOR A DAY
                 outfile.write(deviceId+'\n'+deviceToken+'\n')
         except:
-            xbmc.log("[addon.live.cbcplayertest-%s]: %s" %('No deviceId or token found', 'Abortingg!!!'),xbmc.LOGNOTICE)  
+            #xbmc.log("[addon.live.cbcplayertest-%s]: %s" %('No deviceId or token found', 'Abortingg!!!'),#xbmc.logNOTICE)  
             return
     responseText=self.request_api_cbc_cloud_clearleap_com(lurl,deviceId,deviceToken)
     url = re.compile(r'<url>(.+?)<',re.DOTALL).findall(responseText)[0] 
