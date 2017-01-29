@@ -3783,6 +3783,8 @@ def ShowOSDnownext():
     path = dict(urlparse.parse_qsl(path.split('?',1)[1]))
     plot = path.get('plot')
     progtimes = re.compile(r"\](\d{2}:\d{2})\[",re.DOTALL).findall(plot)
+    if not progtimes:
+        return
     icon = path.get("thumb","0")
     
     
