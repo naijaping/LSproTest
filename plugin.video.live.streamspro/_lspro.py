@@ -501,7 +501,6 @@ def getData(url,fanart, data=None,searchterm=None):
                 allitem = soup('item')
 
                 items = [getItems(allitem[index], fanart) for index,i in enumerate(allitem) if i.get('title') and searchterm in i.get('title').lower().strip()]
-                xbmc.log("[addon.live.streamsproSearchURL-%s]:Items found %s" %(str(url), str(len(items))),xbmc.LOGNOTICE) 
                 return       
 
             if len(soup('channels')) > 0 and addon.getSetting('donotshowbychannels') == 'false':

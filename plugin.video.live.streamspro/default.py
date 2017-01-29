@@ -125,7 +125,6 @@ elif mode==1:
             url=data
             data=None
         #create xml here
-    deg(url)
     _lspro.getData(url,fanart,data)
     xbmcplugin.endOfDirectory(int(sys.argv[1]))
 
@@ -191,7 +190,6 @@ elif mode==11:
 
 elif mode==12:
     #addon_log("setResolvedUrl")
-    deg(url)
     if url.startswith("$pyFunction:"):
         #xbmc.log("$pyFunction in mode 12 Test",xbmc.LOGNOTICE)
         url = _lspro.Func_in_externallink(url)
@@ -276,7 +274,6 @@ elif mode==26: # whats on today EPG
     path = xbmc.getInfoLabel('ListItem.FileNameAndPath')
     xbmc.log(str(path),xbmc.LOGNOTICE)
     path = dict(urlparse.parse_qsl(path.split('?',1)[1]))
-    deg(path)
     url,tvgurl,epgfile,offset = path.get('url'),path.get('tvgurl'),path.get('epgfile'),path.get('offset')
     xbmcplugin.endOfDirectory(int(sys.argv[1]))
    
