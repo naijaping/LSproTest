@@ -55,7 +55,7 @@ try:
 except:
     pass
 try:
-    thumb=urllib.unquote_plus(params["thumb"]) or icon
+    thumb=urllib.unquote_plus(params["thumb"])
     
 except:
     pass
@@ -65,12 +65,12 @@ try:
 except:
     pass
 try:
-    iconimage=urllib.unquote_plus(params["iconimage"]) or icon
+    iconimage=urllib.unquote_plus(params["iconimage"])
     
 except:
     pass
 try:
-    fanart=urllib.unquote_plus(params["fanart"]) or FANART
+    fanart=urllib.unquote_plus(params["fanart"]) 
     
 except:
     pass
@@ -92,16 +92,21 @@ except:
     pass
 
 playitem=''
+
 try:
     playitem=urllib.unquote_plus(params["playitem"])
 except:
-    pass
 
+    pass
 if not playitem =='':
     from _lspro import getSoup,getItems
     s=getSoup('',data=playitem)
     name,url,regexs=getItems(s,None,dontLink=True)
-    mode=117 
+
+    if regexs:
+        mode=117
+    else:
+        mode=12
 if mode==None:
     #addon_log("getSources")
     
@@ -120,7 +125,7 @@ elif mode==1:
             url=data
             data=None
         #create xml here
-
+    deg(url)
     _lspro.getData(url,fanart,data)
     xbmcplugin.endOfDirectory(int(sys.argv[1]))
 
@@ -186,6 +191,7 @@ elif mode==11:
 
 elif mode==12:
     #addon_log("setResolvedUrl")
+    deg(url)
     if url.startswith("$pyFunction:"):
         #xbmc.log("$pyFunction in mode 12 Test",xbmc.LOGNOTICE)
         url = _lspro.Func_in_externallink(url)
@@ -232,8 +238,8 @@ elif mode==16:
 
 elif mode==17 or mode==117:
     addon_log("getRegexParsed")
-    from _lspro import listrepeat
-    listrepeat(regexs,url,name)
+    from _lspro import RepeatedRegexs
+    RepeatedRegexs(regexs,url,name)
 
 
 elif mode==18:
@@ -308,4 +314,6 @@ elif mode==60:
 elif mode==1899:
     #addon_log("Requesting JSON-RPC Items")
     _lspro.pluginquerybyJSON(url, addtoplaylist=True)
-    
+if xbmc.getCondVisibility("Player.HasMedia") and xbmc.Player().isPlaying():    
+    _lspro.ShowOSDnownext()
+ 

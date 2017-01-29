@@ -1,5 +1,5 @@
 import sys,traceback,urllib2,re, urllib,xbmc
-def createCookie(url,cj=None,agent='Mozilla/5.0 (Windows NT 6.1; rv:32.0) Gecko/20100101 Firefox/32.0'):
+def createCookie(url,cj=None,agent='Mozilla/5.0 (Windows NT 6.1; rv:32.0) Gecko/20100101 Firefox/32.0',sendcfcookie=False):
     urlData=''
     try:
         import urlparse,cookielib,urllib2
@@ -19,7 +19,7 @@ def createCookie(url,cj=None,agent='Mozilla/5.0 (Windows NT 6.1; rv:32.0) Gecko/
         #agent = 'Mozilla/5.0 (Windows NT 6.1; WOW64; rv:6.0) Gecko/20100101 Firefox/6.0'
         if cj==None:
             cj = cookielib.CookieJar()
-
+        
         opener = urllib2.build_opener(NoRedirection, urllib2.HTTPCookieProcessor(cj))
         opener.addheaders = [('User-Agent', agent)]
         response = opener.open(url)
@@ -27,8 +27,8 @@ def createCookie(url,cj=None,agent='Mozilla/5.0 (Windows NT 6.1; rv:32.0) Gecko/
         response.close()
 #        print result
 #        print response.headers
-        jschl = re.compile('name="jschl_vc" value="(.+?)"/>').findall(result)[0]
-
+        jschl = re.compile('name="jschl_vc" value="(.+?)"/>').findall(result)
+   
         init = re.compile('setTimeout\(function\(\){\s*.*?.*:(.*?)};').findall(result)[0]
         builder = re.compile(r"challenge-form\'\);\s*(.*)a.v").findall(result)[0]
         decryptVal = parseJSString(init)
@@ -53,25 +53,25 @@ def createCookie(url,cj=None,agent='Mozilla/5.0 (Windows NT 6.1; rv:32.0) Gecko/
             passval=re.compile('name="pass" value="(.*?)"').findall(result)[0]
             query = '%s/cdn-cgi/l/chk_jschl?pass=%s&jschl_vc=%s&jschl_answer=%s' % (u,urllib.quote_plus(passval), jschl, answer)
             xbmc.sleep(4*1000) ##sleep so that the call work
-            
- #       print query
-#        import urllib2
-#        opener = urllib2.build_opener(NoRedirection,urllib2.HTTPCookieProcessor(cj))
-#        opener.addheaders = [('User-Agent', agent)]
-        #print opener.headers
+
         response = opener.open(query)
-        
-                
-            
- #       print response.headers
-        #cookie = str(response.headers.get('Set-Cookie'))
-        #response = opener.open(url)
-        #print cj
-#        print response.read()
+        print list(cj)
+        cookie = '; '.join(['%s=%s' % (i.name, i.value) for i in list(cj)])
+       
+        print cookie
         response.close()
 
-        return urlData
+
     except:
         traceback.print_exc(file=sys.stdout)
-        return urlData
+        cookie = '; '.join(['%s=%s' % (i.name, i.value) for i in list(cj)])
+    if sendcfcookie:
+        return (agent,cookie,urlData)
+    else:
+        return urldata
+#url = 'http://www.ecanlitvizle.net/al-jazeera-tv-izle/3/'
+#agent,cookie,urlData = createCookie(url,sendcfcookie=True)
+#print g[0] 
+#print g[1]
+#print g[2
 

@@ -173,7 +173,6 @@ def makeRequest(url, headers=None):
                         n=vals[0]
                         v='='.join(vals[1:])
                         
-                    print n,v
                     headers[n]=v
                     
             req = urllib2.Request(url,None,headers)
@@ -239,6 +238,19 @@ def getSources():
                         else:
                             getData(sources[0]['url'], sources[0]['fanart'])
         except: traceback.print_exc()
+def date_strto_localtime(date_str,epgtimeformat = "%Y%m%d%H%M%S",my_timezone=150):
+    import pytz
+    notimezone=datetime.datetime.strptime(date_str,epgtimeformat)
+    db_time = pytz.timezone(str(pytz.timezone("Etc/UTC"))).localize(notimezone)
+    if isinstance(my_timezone, int):
+        my_location=pytz.timezone(pytz.all_timezones[int(my_timezone)])
+    else:
+        my_location=pytz.timezone(my_timezone)
+    print my_location
+    converted_time=db_time.astimezone(my_location)
+    print converted_time
+    starttime=converted_time.strftime("%H:%M")
+    return starttime
 
 def addSource(url=None):
         DBfolder = False
@@ -426,7 +438,7 @@ def getSoup(url,data=None):
             else:
                 addon_log("Soup Data not found!")
                 return
-        if '<SetViewMode>' in data:
+        if data and '<SetViewMode>' in data:
             try:
                 viewmode=re.findall('<SetViewMode>(.*?)<',data)[0]
                 xbmc.executebuiltin("Container.SetViewMode(%s)"%viewmode)
@@ -585,7 +597,10 @@ def down_url(url,filename=None,_out=None):
         except:
             filename = cacheKey(url)
             pass
-        filename=os.path.join(profile,filename)
+        if _out:
+            filename = os.path.join(_out,filename)
+        else:
+            filename=os.path.join(profile,filename)
     with open(filename, 'wb') as f:
 
         
@@ -640,7 +655,12 @@ def down_url(url,filename=None,_out=None):
             
 # borrow from https://github.com/enen92/P2P-Streams-XBMC/blob/master/plugin.video.p2p-streams/resources/core/livestreams.py
 def deg(string,level=xbmc.LOGNOTICE):
+
         try:
+            if isinstance(string,list):
+                string= "\n".join(string)
+            elif isinstance(string,tuple):
+                string= "\n".join(map(str,string))
             xbmc.log("[LSPRO::]: %s" %str(string),level)
         except:
             traceback.print_exc()
@@ -735,12 +755,14 @@ def m3ustream_url(stream_url,other,channel_name):
         elif hlsretry and '.m3u8' in stream_url and not 'f4mTester' in stream_url:
             stream_url = 'plugin://plugin.video.f4mTester/?url='+urllib.quote_plus(stream_url)+'&amp;streamtype=HLSRETRY&name='+urllib.quote(channel_name)
         return stream_url
-def cleanname(title):
+def cleanname(title,nocolor=False):
     if title == None: return "UNKNOWN"
     title = re.sub('&#(\d+);', '', title)
     title = re.sub('(&#[0-9]+)([^;^0-9]+)', '\\1;\\2', title)
     title = title.replace('&quot;', '\"').replace('&amp;', '&')
     title = re.sub('\s', '', title.strip()).lower()
+    if nocolor:
+        re.sub("\[/?COLOR.*?\]","",title)
 
     
     
@@ -826,7 +848,6 @@ def getItems(item,fanart,itemart={},item_info={},total=1,dontLink=False):
                 addon_log('parentalblock Error')
                 applyblock = ''
             if applyblock=='true' and parentalblock: return
-                
             try:
                 name = item('title')[0].string
                 if name is None:
@@ -1195,8 +1216,9 @@ def cacheKey(url):
     except:
         import md5
         return md5.new(url).hexdigest()
-def listrepeat(regexs,url,name):
+def RepeatedRegexs(regexs,url,name):
     data=None
+    #deg((regexs,url,name))
     if regexs and 'listrepeat' in urllib.unquote_plus(regexs):
         listrepeat,ret,m,regexs, cookieJar =getRegexParsed(regexs, url)
         #print listrepeat,ret,m,regexs
@@ -1312,7 +1334,7 @@ def listrepeat(regexs,url,name):
         xbmcplugin.endOfDirectory(int(sys.argv[1]))
     else:
         url,setresolved = getRegexParsed(regexs, url)
-        print repr(url),setresolved,'imhere'
+        #deg((repr(url),setresolved,'imhere')) 
         if url:
             if '$PLAYERPROXY$=' in url:
                 url,proxy=url.split('$PLAYERPROXY$=')
@@ -3018,6 +3040,8 @@ def addDir(name,url,mode,itemart,item_info,regexs=None,reg_url=None):
             liz.addContextMenuItems(contextMenu)
         ok=xbmcplugin.addDirectoryItem(handle=int(sys.argv[1]),url=u,listitem=liz,isFolder=True)
         return ok
+
+        
 def ytdl_download(url,title,media_type='video'):
     # play in xbmc while playing go back to contextMenu(c) to "!!Download!!"
     # Trial yasceen: seperate |User-Agent=
@@ -3609,8 +3633,9 @@ def epg_source_toregfile(epgxml,epgtimeformat,epgfilewithreg):
             with open(epgfilewithreg,"w") as f:
                 f.write(json.dumps(GUIDE))
             try:
-                os.remove(epgxml)
                 pDialog.close()
+                os.remove(epgxml)
+                
             except Exception:
                 pass
             
@@ -3636,9 +3661,6 @@ def epginfo(channel,onedayEPG=False):
     hh= [i for i in GUIDE[channel].values() if  startorstoptodatetime(i['start']) <= now + datetime.timedelta(hours = 4) and startorstoptodatetime(i['stop']) > now ]
     #
     items_list = sorted(hh, key= lambda d: int(d["start"]))
-    #
-    #items_list = GUIDE[channel].values()
-    #print items_list
     for index,item in enumerate(items_list):
         start = startorstoptodatetime(item['start'])
       
@@ -3646,11 +3668,18 @@ def epginfo(channel,onedayEPG=False):
             #try:
             #python 2.7 only
             item_info['duration'] = int((startorstoptodatetime(item['stop'])-start).total_seconds())
-            summary ='\n[COLOR yellow]' + start.strftime('%H:%M') + ' [/COLOR][COLOR cyan][B]' + item['title']+ ":" +item['subtitle'] + '\n' + item['plot'] + "[/B][/COLOR]"
+            summary ='NOW([COLOR yellow]' + start.strftime('%H:%M') + ' [/COLOR])[COLOR cyan][B]' + item['title']+ ":" +item['subtitle'] + '\n' + item['plot'] + "[/B][/COLOR]!!!\n"
             continue
-        summary = summary + '\n[COLOR skyblue]' + start.strftime('%H:%M') + ' ' + item['title']+ "[/COLOR]:" +item['subtitle'] + '\n' + item['plot']
+        else:
+            nowtonxstart = str((start-now)).split(":")
+            if nowtonxstart[0]=='0':
+                duration = "[COLOR hotpink][I](In:%sm)[/I][/COLOR]" %nowtonxstart[1]
+            else:
+                duration = "[COLOR hotpink][I](In:%sh%sm)[/I][/COLOR]" %(nowtonxstart[0],nowtonxstart[1])
+                
+        summary = summary + '[COLOR skyblue]' + start.strftime('%H:%M') + '%s ' %duration+ item['title']+ "[/COLOR]:" +item['subtitle'] + '\n' + item['plot'] +"!!!\n"
         item_info['genre']  = item.get('genre',"TV")
-    item_info['plot'] = summary
+    item_info['plot'] = re.sub("\n+","\n",summary)
     
     return itemart,item_info
 #E_con(soup or url and list of names) to get nameinepgfile(in epgfile) and names(not inclued in epgfile)
@@ -3660,17 +3689,17 @@ def CheckEPGtimeValidaty(E_con,itemsname):
         
         GUIDE = json.loads(open(epgdictfile).read())
         guidekeys = GUIDE.keys()
-        
-        FF=[]
+
+        #FF=[]
         nameinepgfile=[]
-        for name in sorted(itemsname,reverse=True):
-            if  name[1] in guidekeys:
-                nameinepgfile.append(name)
-                itemsname.remove(name)
-                FF.append(starttimeofchannel(name[1]))
+        #for name in sorted(itemsname,reverse=True):
+        #    if  name[1] in guidekeys:
+        #        nameinepgfile.append(name)
+        #        itemsname.remove(name)
+        #        FF.append(starttimeofchannel(name[1]))
                 
-        #EE=[(starttimeofchannel(name[1]),nameinepgfile.append(name),itemsname.remove(name)) for name in sorted(itemsname,reverse=True)  if  name[1] in guidekeys]
-        failcount= Counter(elem for elem in FF).get("1") or 0
+        FF=[(starttimeofchannel(name[1]),nameinepgfile.append(name),itemsname.remove(name)) for name in sorted(itemsname,reverse=True)  if  name[1] in guidekeys]
+        failcount= Counter(elem[0] for elem in FF).get("1") or 0
         if nameinepgfile and int(failcount*100/len(nameinepgfile)) > 45:
             getepgcontent(E_con,getnew=True)
         return itemsname,nameinepgfile
@@ -3692,16 +3721,92 @@ def lspro_Epg(soup):
 
         total = len(F)    
         names = [(index,cleanname(i.title.text.decode('utf-8'))) for index,i in enumerate(F)]
-    pDialog.update(10, "Total names found : %s" %str(len(names))) 
+    pDialog.update(5, "Total names found : %s" %str(len(names)),"Total Epgfiles found:%s" %len(E))
+    percent = 95/len(E)
     for index,E_con in enumerate(E):
         names,epgnames=CheckEPGtimeValidaty(E_con,names)
-        pDialog.update(int(len(epgnames)*100./total), "Listing items with epg" )
+        Ppercent= int(percent)*(index+1)
+        pDialog.update(int(Ppercent), "Updateing EPG for %s channels" %len(epgnames) )
         itemsartinfo =  [(epgitemcount,epginfo(name)) for epgitemcount,name in epgnames]
         
         [getItems(F[epgitemcount],FANART,epgiteminfo[0],epgiteminfo[1],total=total) for epgitemcount,epgiteminfo in itemsartinfo]
     
         GUIDE={}
         
+    pDialog.update(int(len(E)*100./len(E)), "Finished Listing one epg file" )    
     if len(names) > 0:
         [getItems(F[epgitemcount],FANART) for epgitemcount,i in names ]
     pDialog.close()
+def addDirPlayable(name, url, mode,itemart,item_info,playslideshow=None):
+    u = sys.argv[0] + "?url=" + urllib.quote_plus(url) + "&mode=" + str(mode) + "&name=" + urllib.quote_plus(
+        name) 
+    # print 'adddirplayable',u
+    contextMenu = []
+    ok = True
+    showcontext = item_info.get('showcontext')
+    liz = xbmcgui.ListItem(name)
+    item_info["Title"] = name
+#    if not itemart.get('thumb'):
+#        itemart['thumb'] = icon
+    if use_thumb and not itemart.get('fanart'):
+        itemart['fanart']= itemart.get('thumb') or FANART
+    if not itemart.get('thumb'):
+        itemart['thumb'] = icon
+    if playslideshow:
+        liz.setInfo( type="image", infoLabels={"Title": name} )
+        #xbmcplugin.setContent(int(sys.argv[1]), 'images')
+        #liz.setInfo(type="pictures", infoLabels=item_info)
+    else:
+        liz.setInfo(type="Video", infoLabels=item_info)
+        liz.setArt(itemart)    
+    
+  
+    
+    if showcontext and showcontext == 'YTsearch':  # Did not work
+        youtube_con = 'plugin://plugin.video.youtube/kodion/search/query/?q=' + urllib.quote_plus(
+            name.split('[')[0] + ' album')
+        contextMenu.append(('[COLOR white]Play from Youtube[/COLOR]', 'XBMC.RunPlugin(%s?url=%s&mode=1899&name=%s)'
+                            % (sys.argv[0], urllib.quote_plus(youtube_con), urllib.quote_plus(name))))
+        liz.addContextMenuItems(contextMenu)
+    ok = xbmcplugin.addDirectoryItem(handle=int(sys.argv[1]), url=u, listitem=liz, isFolder=False)
+    return ok
+def addDirectoryItem( url, listitem=None, isFolder=False):
+    return xbmcplugin.addDirectoryItem(handle=int(sys.argv[1]), url=url, listitem=listitem, isFolder=isFolder)
+def notification(header="", message="", sleep=3000,icon=icon):
+    """ Will display a notification dialog with the specified header and message,
+    in addition you can set the length of time it displays in milliseconds and a icon image.
+    """
+    xbmc.executebuiltin("XBMC.Notification(%s,%s,%i,%s)" % ( header, message, sleep,icon ))
+def ShowOSDnownext():
+    path = xbmc.getInfoLabel('ListItem.FileNameAndPath')
+    xbmc.log(str(path),xbmc.LOGNOTICE)
+    path = dict(urlparse.parse_qsl(path.split('?',1)[1]))
+    plot = path.get('plot')
+    progtimes = re.compile(r"\](\d{2}:\d{2})\[",re.DOTALL).findall(plot)
+    icon = path.get("thumb","0")
+    
+    
+    plots = plot.split("!!!\n")
+    #deg(plots)
+    plot = plots.pop(0)
+    heading,mesg = plot.rsplit("\n",1)
+    heading = (re.sub(r"\[/?[COLOR|B|I].*?\]","",heading).split("\n",1)[0]).replace("\n"," ")
+    notification(heading, "Playing", sleep=10000,icon=icon)
+    for i,plot in enumerate(plots):
+        if plot:
+            heading,mesg = plot.rsplit("\n",1)
+            heading = (re.sub(r"\[/?[COLOR|B|I].*?\]","",heading).split(")",1)[1]).replace("\n"," ")
+            progtime = progtimes[i]
+            notimezone=datetime.datetime.strptime(now.strftime("%Y%m%d") + progtime.split(":")[0]+progtime.split(":")[1],"%Y%m%d%H%M")
+            waitfornxnoti=int((notimezone-now).total_seconds())
+
+            
+            while 1:
+                time.sleep(10)
+                waitfornxnoti =  waitfornxnoti-10
+                if xbmc.abortRequested == True or not xbmc.Player().isPlaying():
+                    return sys.exit()
+                if int(waitfornxnoti)<60 :
+                    break
+            notification(heading, "Next In 1 minuts", sleep=10000,icon=icon)
+ 
