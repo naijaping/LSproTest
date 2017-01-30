@@ -68,7 +68,7 @@ def createCookie(url,cj=None,agent='Mozilla/5.0 (Windows NT 6.1; rv:32.0) Gecko/
     if sendcfcookie:
         return (agent,cookie,urlData)
     else:
-        return urldata
+        return urlData
 #url = 'http://www.ecanlitvizle.net/al-jazeera-tv-izle/3/'
 #agent,cookie,urlData = createCookie(url,sendcfcookie=True)
 #print g[0] 

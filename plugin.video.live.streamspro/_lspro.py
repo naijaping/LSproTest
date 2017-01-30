@@ -104,7 +104,25 @@ def addon_log(string,level=xbmc.LOGNOTICE):
             xbmc.log("[addon.live.streamspro-%s]: %s" %('addon_version', string),level)
         except:
             pass
-
+def date_strto_localtime(date_str,epgtimeformat = "%Y%m%d%H%M%S",my_timezone=150):
+    import pytz
+#try:datetime.datetime(*(time.strptime(input, epgtimeformat)[0:6]))
+    notimezone=datetime.datetime(*(time.strptime(now.strftime("%Y%m%d") + date_str.split(":")[0]+date_str.split(":")[1],epgtimeformat)[0:6]))
+    db_time = pytz.timezone(str(pytz.timezone("Etc/UTC"))).localize(notimezone)
+    if isinstance(my_timezone, int):
+        my_location=pytz.timezone(pytz.all_timezones[int(my_timezone)])
+    else:
+        my_location=pytz.timezone(my_timezone)
+    print my_location
+    converted_time=db_time.astimezone(my_location)
+    print converted_time
+    starttime=converted_time.strftime("%H:%M")
+    print starttime
+    return starttime
+    #item.setProperty('starttime',starttime)
+#except Exception, e:
+    #xbmc.log(msg="[Match Center] Exception: %s" % (str(e)), level=xbmc.LOGDEBUG)
+    
 if os.path.exists(favorites)==True:
     FAV = open(favorites).read()
 else: FAV = []
@@ -238,19 +256,6 @@ def getSources():
                         else:
                             getData(sources[0]['url'], sources[0]['fanart'])
         except: traceback.print_exc()
-def date_strto_localtime(date_str,epgtimeformat = "%Y%m%d%H%M%S",my_timezone=150):
-    import pytz
-    notimezone=datetime.datetime.strptime(date_str,epgtimeformat)
-    db_time = pytz.timezone(str(pytz.timezone("Etc/UTC"))).localize(notimezone)
-    if isinstance(my_timezone, int):
-        my_location=pytz.timezone(pytz.all_timezones[int(my_timezone)])
-    else:
-        my_location=pytz.timezone(my_timezone)
-    print my_location
-    converted_time=db_time.astimezone(my_location)
-    print converted_time
-    starttime=converted_time.strftime("%H:%M")
-    return starttime
 
 def addSource(url=None):
         DBfolder = False
@@ -451,7 +456,8 @@ def processPyFunction(data):
         if data and len(data)>0 and data.startswith('$pyFunction:'):
             data=doEval(data.split('$pyFunction:')[1],'',None,None )
     except: pass
-
+    deg("ddddddddddddddddddddddddddddddddd")
+    deg(data)
     return data
 
   
@@ -854,7 +860,10 @@ def getItems(item,fanart,itemart={},item_info={},total=1,dontLink=False):
                 elif '[COLOR #' in name:
                     name= ''.join([brace.replace(']','00]',1) for brace in name.split('#')])
                 try:
-                    name=processPyFunction(name)
+                    
+                    if '$pyFunction:' in name:
+                        deg("processPyFunciton")
+                        name=processPyFunction(name)
                 except: pass                
             except:
                 addon_log('Name Error')
@@ -3769,8 +3778,9 @@ def addDirPlayable(name, url, mode,itemart,item_info,playslideshow=None):
         liz.addContextMenuItems(contextMenu)
     ok = xbmcplugin.addDirectoryItem(handle=int(sys.argv[1]), url=u, listitem=liz, isFolder=False)
     return ok
-def addDirectoryItem( url, listitem=None, isFolder=False):
-    return xbmcplugin.addDirectoryItem(handle=int(sys.argv[1]), url=url, listitem=listitem, isFolder=isFolder)
+def addDirectoryItem( url, name, isFolder=False):
+
+    return xbmcplugin.addDirectoryItem(handle=int(sys.argv[1]), url=url, listitem=xbmcgui.ListItem(name), isFolder=isFolder)
 def notification(header="", message="", sleep=3000,icon=icon):
     """ Will display a notification dialog with the specified header and message,
     in addition you can set the length of time it displays in milliseconds and a icon image.
