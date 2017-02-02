@@ -17,6 +17,7 @@ from collections import OrderedDict,Counter
 import fnmatch
 import cookielib,base64
 import xml.etree.ElementTree
+
 try:
     from xml.sax.saxutils import escape
 except: traceback.print_exc()
@@ -38,7 +39,7 @@ now = datetime.datetime.now().replace(microsecond=0)
 resolve_url=["youwatch",'180upload.com', 'letwatch.us','allmyvideos.net', 'bestreams.net', 'clicknupload.com', 'cloudzilla.to', 'movshare.net', 'novamov.com', 'nowvideo.sx', 'videoweed.es', 'daclips.in', 'datemule.com', 'fastvideo.in', 'faststream.in', 'filehoot.com', 'filenuke.com', 'sharesix.com',  'plus.google.com', 'picasaweb.google.com', 'gorillavid.com', 'gorillavid.in', 'grifthost.com', 'hugefiles.net', 'ipithos.to', 'ishared.eu', 'kingfiles.net', 'mail.ru', 'my.mail.ru', 'videoapi.my.mail.ru', 'mightyupload.com', 'mooshare.biz', 'movdivx.com', 'movpod.net', 'movpod.in', 'movreel.com', 'mrfile.me', 'nosvideo.com', 'openload.io', 'played.to', 'bitshare.com', 'filefactory.com', 'k2s.cc', 'oboom.com', 'rapidgator.net', 'primeshare.tv', 'bitshare.com', 'filefactory.com', 'k2s.cc', 'oboom.com', 'rapidgator.net', 'sharerepo.com', 'stagevu.com', 'streamcloud.eu', 'streamin.to', 'thefile.me', 'thevideo.me', 'tusfiles.net', 'uploadc.com', 'zalaa.com', 'uploadrocket.net', 'uptobox.com', 'v-vids.com', 'veehd.com', 'vidbull.com', 'videomega.tv', 'vidplay.net', 'vidspot.net', 'vidto.me', 'vidzi.tv', 'vimeo.com', 'vk.com', 'vodlocker.com', 'xfileload.com', 'xvidstage.com', 'zettahost.tv']
 g_ignoreSetResolved=['plugin.video.dramasonline','plugin.video.f4mTester','plugin.video.shahidmbcnet','plugin.video.SportsDevil','plugin.stream.vaughnlive.tv','plugin.video.ZemTV-shani']
 art_tags = ['thumbnail', 'fanart', 'poster','clearlogo','banner','clearart']
-info_tags = ['director' ,'season','episode', 'writer','date', 'info', 'rating', 'studio', 'source','genre','plotoutline','credits','dateadded','tagline']
+info_tags = ['director' ,'season','episode', 'writer','date', 'info', 'rating', 'studio', 'source','genre','plotoutline','credits','dateadded','tagline',"tvshowtitle","label"]
 
 addon = xbmcaddon.Addon('plugin.video.live.streamspro')
 addon_version = addon.getAddonInfo('version')
@@ -456,8 +457,6 @@ def processPyFunction(data):
         if data and len(data)>0 and data.startswith('$pyFunction:'):
             data=doEval(data.split('$pyFunction:')[1],'',None,None )
     except: pass
-    deg("ddddddddddddddddddddddddddddddddd")
-    deg(data)
     return data
 
   
@@ -761,6 +760,10 @@ def m3ustream_url(stream_url,other,channel_name):
             stream_url = 'plugin://plugin.video.f4mTester/?url='+urllib.quote_plus(stream_url)+'&amp;streamtype=HLSRETRY&name='+urllib.quote(channel_name)
         return stream_url
 def cleanname(title,nocolor=False):
+    try:
+        title = title.decode("utf-8","ignore")
+    except:
+        pass
     if title == None: return "UNKNOWN"
     title = re.sub('&#(\d+);', '', title)
     title = re.sub('(&#[0-9]+)([^;^0-9]+)', '\\1;\\2', title)
@@ -862,7 +865,6 @@ def getItems(item,fanart,itemart={},item_info={},total=1,dontLink=False):
                 try:
                     
                     if '$pyFunction:' in name:
-                        deg("processPyFunciton")
                         name=processPyFunction(name)
                 except: pass                
             except:
@@ -995,7 +997,8 @@ def getItems(item,fanart,itemart={},item_info={},total=1,dontLink=False):
                 item_info =  dict((art_tag.replace('info','plot'),item(art_tag)[0].string) for art_tag in info_tags if item(art_tag)and item(art_tag)[0].string is not None)
           
             thumbnail = itemart.get("thumb")
-
+            #deg("thumbnail for %s" %name)
+            #deg(str(thumbnail))
             if not thumbnail and  len(item("thumbnail")) >0: #overwrite epg thumb if <thumbnail>
                 try:
                     thumbnail=item('thumbnail')[0].string
@@ -3235,7 +3238,7 @@ def addLink(url,name,itemart={},item_info={},regexs=None,total=1,setCookie=""):
             u += "&setCookie="+urllib.quote_plus(setCookie)
         item_info["Title"] = name
 
-        liz=xbmcgui.ListItem(name)
+        liz=xbmcgui.ListItem(name,item_info.get("Label"," "))
         iconimage = itemart.get('thumb')
         
         if not iconimage:
@@ -3263,6 +3266,7 @@ def addLink(url,name,itemart={},item_info={},regexs=None,total=1,setCookie=""):
         fanart = itemart.get('fanart')  or FANART          
         if showcontext:
             #contextMenu = []
+            epgcontext = item_info.get("epgcontext",None)
             if disableepg == 'false' and item_info.get('tvgurl') and not item_info.get('tvgurl') == '0':
                 u += "&tvgurl=%s&epgfile=%s&offset=%s" %(item_info.get('tvgurl','0'),
                                               item_info.get('epgfile','0')
@@ -3271,7 +3275,11 @@ def addLink(url,name,itemart={},item_info={},regexs=None,total=1,setCookie=""):
                     ('What\'s on Today','Container.Update(%s?mode=26&url=%s&name=%s,return)'
                      %(sys.argv[0], urllib.quote_plus(url), urllib.quote_plus(name.split('::')[0])))
                      )                
-                
+            if epgcontext:
+                contextMenu.append(
+                    ('Find Show/Movie in Exodus','Container.Update(%s?mode=54&url=%s&name=%s,return)'
+                     %(sys.argv[0], urllib.quote_plus(url), urllib.quote_plus(name.split('::')[0])))
+                     )                
                 
             if showcontext == 'fav':
                 contextMenu.append(
@@ -3600,7 +3608,7 @@ Severide agrees to a bone marrow donation; Casey and Dawson attempt to find harm
   </programme>'''
 def epg_source_toregfile(epgxml,epgtimeformat,epgfilewithreg):
     epgfile = open(epgxml,"rb").read()
-    if epgfile != None:
+    if epgfile is not None:
         try:
             root = xml.etree.ElementTree.fromstring(epgfile)
         except:
@@ -3613,29 +3621,32 @@ def epg_source_toregfile(epgxml,epgtimeformat,epgfilewithreg):
             ALLROOTS = root.findall("./programme")
             total = len(ALLROOTS)
             for index,programme in  enumerate(ALLROOTS):
+                item={}
                 subtitle=desc=""
                 channel = cleanname(programme.get('channel')) #clenname in here.(nospace,lower)
-                start = programme.get('start')[:14]
-                stop = programme.get('stop')[:14]
-                title = programme.find('title').text
+                start=item["start"] = programme.get('start')[:14]
+                item["stop"] = programme.get('stop')[:14]
+                item["title"] = programme.find('title').text
                 if not programme.find('sub-title') is None:
-                    subtitle = programme.find('sub-title').text
+                    item["subtitle"] = programme.find('sub-title').text
                 if not programme.find('desc') is None:
-                    desc = programme.find('desc').text
+                    item["plot"] = programme.find('desc').text
+                icon = programme.find('icon')
+                if not icon is None:
+                    item["thumb"] = icon.attrib.get("src")
                 try:
-                    category = " ".join([i.text for i in epgsoup('category')])
+                    item["genre"] = ",".join([i.text for i in programme.findall('category')])
                     #programme.find('category').text
                 except:
-                    category = "Lspro"
+                    item["genre"] = "Lspro"
                     pass
                 try:
-                    episodenum = programme.find('episode-num').text
+                    item["episodenum"] = programme.find('episode-num').text
                 except:
-                    episodenum = '0'
+                    
                     pass
                 pDialog.update(int(index*100./total), channel, "Writing %s" %channel)
 
-                item = {"episodenum": episodenum,"genre":category,'start': start, 'stop': stop, 'title': title,"subtitle":subtitle,"plot":desc}
                 GUIDE.setdefault(channel, {})[start] = item
             GUIDE["FileKEY"] = epgfilewithreg
             with open(epgfilewithreg,"w") as f:
@@ -3660,7 +3671,7 @@ def startorstoptodatetime(input):
 
     
                 
-@LS_CACHE_epginfo                
+#@LS_CACHE_epginfo                
 def epginfo(channel,onedayEPG=False):                            
     summary = ''
     itemart={}
@@ -3671,12 +3682,33 @@ def epginfo(channel,onedayEPG=False):
     items_list = sorted(hh, key= lambda d: int(d["start"]))
     for index,item in enumerate(items_list):
         start = startorstoptodatetime(item['start'])
-      
+        label = item['title']+ ":" +item.get('subtitle'," ")
         if index == 0:
             #try:
             #python 2.7 only
             item_info['duration'] = int((startorstoptodatetime(item['stop'])-start).total_seconds())
-            summary ='NOW([COLOR yellow]' + start.strftime('%H:%M') + ' [/COLOR])[COLOR cyan][B]' + item['title']+ ":" +item['subtitle'] + '\n' + item['plot'] + "[/B][/COLOR]!!!\n"
+            #summary = "NOW([COLOR yellow]{0} [/COLOR])[COLOR cyan][B]{1}\n{2}[/B][/COLOR]!!!\n".format(start.strftime('%H:%M'),label,item.get('plot'," "))
+            summary ='NOW([COLOR yellow]' + start.strftime('%H:%M') + ' [/COLOR])[COLOR cyan][B]' + item['title']+ ":" +item.get('subtitle'," ") + '\n' + item.get('plot'," ")+"[/B][/COLOR]!!!\n"
+            if item.get("thumb"):
+                itemart["thumb"]= item.get("thumb")
+            episodenum=item.get("episodenum")
+            if episodenum: #6.7/15.
+                #deg(episodenum)
+                if "." in episodenum:
+                    epinum = item.get("episodenum").split(".") #0..
+                    item_info["season"] = int(epinum[0])
+                    item_info["episode"] = int(epinum[1].split("/")[0]) if len(epinum[1]) >0 else 0
+
+                elif "S" in episodenum:
+                    item_info["season"] = int(re_me(episodenum,r"S.*?(\d{1,2})"))
+                    item_info["episode"] = int(re_me(episodenum,r"E*?(\d{1,2})")) 
+            #    item_info['tvshowtitle'] = '%sx%02d . %s' % (str(item_info.get("season")), item_info.get("episode"), label)
+            #else:
+            item_info['tvshowtitle'] = label
+            item_info['Label'] = label
+            item_info['StartTime'] = item['start']
+            item_info["epgcontext"] = "epgcontext"
+            item_info["genre"] = item.get("genre")
             continue
         else:
             nowtonxstart = str((start-now)).split(":")
@@ -3685,8 +3717,7 @@ def epginfo(channel,onedayEPG=False):
             else:
                 duration = "[COLOR hotpink][I](In:%sh%sm)[/I][/COLOR]" %(nowtonxstart[0],nowtonxstart[1])
                 
-        summary = summary + '[COLOR skyblue]' + start.strftime('%H:%M') + '%s ' %duration+ item['title']+ "[/COLOR]:" +item['subtitle'] + '\n' + item['plot'] +"!!!\n"
-        item_info['genre']  = item.get('genre',"TV")
+        summary = summary + '[COLOR skyblue]' + start.strftime('%H:%M') + '%s ' %duration+ item['title']+ "[/COLOR]:" +item.get('subtitle'," ") + '\n' + item.get('plot'," ") +"!!!\n"
     item_info['plot'] = re.sub("\n+","\n",summary)
     
     return itemart,item_info
@@ -3712,7 +3743,8 @@ def CheckEPGtimeValidaty(E_con,itemsname):
             getepgcontent(E_con,getnew=True)
         return itemsname,nameinepgfile
 def lspro_Epg(soup):
-   
+    F = soup("item") + soup("epgitem") # can be safely remove soup("epgitem") and soup("itemepg")
+
     pDialog = xbmcgui.DialogProgress()
     pDialog.create("Getting EPG","Please Wait" )
     global GUIDE
@@ -3725,26 +3757,33 @@ def lspro_Epg(soup):
             return epgdictfile
     else:
         E=  list(set(soup("epg")+soup("itemepg")))
-        F = soup("item") + soup("epgitem") # can be safely remove soup("epgitem") and soup("itemepg")
-
+    
         total = len(F)    
-        names = [(index,cleanname(i.title.text.decode('utf-8'))) for index,i in enumerate(F)]
+        names = [(index,cleanname(i("name")[0].string)) if i("name") else (index,cleanname(i.get("title"))) for index,i in enumerate(F)]
     pDialog.update(5, "Total names found : %s" %str(len(names)),"Total Epgfiles found:%s" %len(E))
     percent = 95/len(E)
     for index,E_con in enumerate(E):
-        names,epgnames=CheckEPGtimeValidaty(E_con,names)
-        Ppercent= int(percent)*(index+1)
-        pDialog.update(int(Ppercent), "Updateing EPG for %s channels" %len(epgnames) )
-        itemsartinfo =  [(epgitemcount,epginfo(name)) for epgitemcount,name in epgnames]
+        try:
+            names,epgnames=CheckEPGtimeValidaty(E_con,names)
+
+            Ppercent= int(percent)*(index+1)
+            pDialog.update(int(Ppercent), "Updateing EPG for %s channels" %len(epgnames) )
+            itemsartinfo =  [(epgitemcount,epginfo(name)) for epgitemcount,name in epgnames]
+            
+            [getItems(F[epgitemcount],FANART,epgiteminfo[0],epgiteminfo[1],total=total) for epgitemcount,epgiteminfo in itemsartinfo]
         
-        [getItems(F[epgitemcount],FANART,epgiteminfo[0],epgiteminfo[1],total=total) for epgitemcount,epgiteminfo in itemsartinfo]
-    
-        GUIDE={}
+            GUIDE={}
+        except Exception:
+            traceback.print_exc()
+            GUIDE={}
+            pass            
         
-    pDialog.update(int(len(E)*100./len(E)), "Finished Listing one epg file" )    
+
+    pDialog.update(int(len(E)*100./len(E)), "Finished Listing epg files" )    
     if len(names) > 0:
         [getItems(F[epgitemcount],FANART) for epgitemcount,i in names ]
     pDialog.close()
+    
 def addDirPlayable(name, url, mode,itemart,item_info,playslideshow=None):
     u = sys.argv[0] + "?url=" + urllib.quote_plus(url) + "&mode=" + str(mode) + "&name=" + urllib.quote_plus(
         name) 
@@ -3788,9 +3827,11 @@ def notification(header="", message="", sleep=3000,icon=icon):
     xbmc.executebuiltin("XBMC.Notification(%s,%s,%i,%s)" % ( header, message, sleep,icon ))
 def ShowOSDnownext():
     path = xbmc.getInfoLabel('ListItem.FileNameAndPath')
-    xbmc.log(str(path),xbmc.LOGNOTICE)
+    
     path = dict(urlparse.parse_qsl(path.split('?',1)[1]))
-    plot = path.get('plot')
+
+    plot = xbmc.getInfoLabel('ListItem.Plot')
+    dur = xbmc.getInfoLabel('ListItem.Duration')
     progtimes = re.compile(r"\](\d{2}:\d{2})\[",re.DOTALL).findall(plot)
     if not progtimes:
         return

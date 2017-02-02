@@ -23,6 +23,8 @@ def get_params():
         return param
 def deg(string,level=xbmc.LOGNOTICE):
         try:
+            if isinstance(string,list):
+                string= "\n".join(string)        
             xbmc.log("[LSPRO::]: %s" %str(string),level)
         except:
             traceback.print_exc()
@@ -301,6 +303,26 @@ elif mode==56:
 elif mode==53:
     #addon_log("Requesting JSON-RPC Items")
     _lspro.pluginquerybyJSON(url)
+elif mode==54:
+    #addon_log("Requesting JSON-RPC Items")
+    tvshowname = xbmc.getInfoLabel('ListItem.TVShowTitle').split(":")[0]
+    if not tvshowname:
+        tvshowname = xbmc.getInfoLabel('ListItem.Title')
+    #_search(url,name)
+    #fill up search by sendInput
+    season = xbmc.getInfoLabel('ListItem.Season')
+    episode = xbmc.getInfoLabel('ListItem.Episode')
+    if season or episode:
+        url = 'http://api-v2launch.trakt.tv/search?type=show&limit=20&page=1&query=' + urllib.quote_plus(tvshowname)
+        url = '%s?action=tvshowPage&url=%s' % ("plugin://plugin.video.exodus/", urllib.quote_plus(url))
+
+    else: 
+        url = 'http://api-v2launch.trakt.tv/search?type=movie&limit=20&page=1&query=' + urllib.quote_plus(tvshowname)
+        #going back dont work b/c query is empty
+        # solved upgrading kodi to  kodi 17rc4
+        url = '%s?action=moviePage&url=%s' % ("plugin://plugin.video.exodus/", urllib.quote_plus(url))
+    
+    _lspro.pluginquerybyJSON(url)
 elif mode==60:
     #addon_log("Requesting JSON-RPC Items")
     xbmc.log(str(url),xbmc.LOGNOTICE)
@@ -311,6 +333,6 @@ elif mode==60:
 elif mode==1899:
     #addon_log("Requesting JSON-RPC Items")
     _lspro.pluginquerybyJSON(url, addtoplaylist=True)
-if xbmc.getCondVisibility("Player.HasMedia") and xbmc.Player().isPlaying():    
+if xbmc.getCondVisibility("Player.HasMedia") and xbmc.Player().isPlaying()and plot:    
     _lspro.ShowOSDnownext()
  
