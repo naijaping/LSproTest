@@ -512,7 +512,6 @@ def getData(url,fanart, data=None,searchterm=None):
                 channels = soup('channel')
                 for channel in channels:
 
-
                     linkedUrl=''
                     lcount=0
                     try:
@@ -549,6 +548,8 @@ def getData(url,fanart, data=None,searchterm=None):
                     except:
                         
                         addon_log('There was a problem adding directory from getData(): '+name.encode('utf-8', 'ignore'))
+                
+           
             else:
                     if disableepg == 'true' :
                         map(getItems,soup('epgitem'),[fanart])                    
@@ -593,21 +594,14 @@ def down_url(url,filename=None,_out=None):
                 filename= re_me (attachment[0],r'filename\W*([^\'";]+)')
                 if filename == "":
                     raise
-                else:
-                    if ".zip" in filename:
-                        ZIP= True
             else:
                 raise
         except:
             filename = cacheKey(url)
             pass
-        if _out:
-            filename = os.path.join(_out,filename)
-        else:
-            filename=os.path.join(profile,filename)
+        filename=os.path.join(profile,filename)
+          
     with open(filename, 'wb') as f:
-
-        
         while True:
             buffer = song.read(block_sz)
             if not buffer:
@@ -619,10 +613,13 @@ def down_url(url,filename=None,_out=None):
             pDialog.update(int(size * 100. / file_size),message.format(str(int(size * 100. / file_size)),filename.rsplit('\\',1)[0]))
     pDialog.close()
     xbmc.sleep(1) #change from 10 to 0.5
-    if open(filename).read(1024).startswith('\x50\x4b\x03\x04') or ZIP:
+    return filename
+def contentfromZip(filename,_out=None):
+        
+    if open(filename).read(1024).startswith('\x50\x4b\x03\x04') or filename.endswith(".zip"):
         #try:
             if not _out:
-                _out = os.path.join(profile,cacheKey(url))
+                _out = os.path.join(profile,cacheKey(filename))
             import zipfile
         
             zfile = zipfile.ZipFile(filename, 'r')
@@ -635,15 +632,15 @@ def down_url(url,filename=None,_out=None):
             return _out        
     elif open(filename).read(1024).startswith('\x1f\x8b\x08'):
             import gzip
-        #try:
             zfile = gzip.open(filename, 'rb')
             content= zfile.read()
             zfile.close()
             with open(filename,"wb") as f:
-                f.write(content)
+                 f.write(content)
     
                 
-    return filename
+            return filename
+    return
             
         
         
@@ -997,8 +994,7 @@ def getItems(item,fanart,itemart={},item_info={},total=1,dontLink=False):
                 item_info =  dict((art_tag.replace('info','plot'),item(art_tag)[0].string) for art_tag in info_tags if item(art_tag)and item(art_tag)[0].string is not None)
           
             thumbnail = itemart.get("thumb")
-            #deg("thumbnail for %s" %name)
-            #deg(str(thumbnail))
+
             if not thumbnail and  len(item("thumbnail")) >0: #overwrite epg thumb if <thumbnail>
                 try:
                     thumbnail=item('thumbnail')[0].string
@@ -1744,7 +1740,6 @@ def kodiJsonRequest(params):
         response = json.loads(request)
     except UnicodeDecodeError:
         response = json.loads(request.decode('utf-8', 'ignore'))
-
     try:
         if 'result' in response:
             return response['result']
@@ -2966,11 +2961,23 @@ def _search(url,name):
              'Youtube','DailyMotion','Vimeo']
     dialog = xbmcgui.Dialog()
     index = dialog.select('Choose a video source', names)
+    #proxyType = kodiJsonRequest({"jsonrpc":"2.0","method":"Input.SendText","params":{"text":"ddddd" ,"done": "True"} , 'id': "1"})
+    #jsondict = dict(jsonrpc = "2.0", id= "1" ,method = "Input.SendText", params = dict(text = "a", done = False))
+    #deg(str(jsondict))
 
     if index >= 0:
         url = pluginsearchurls[index]
 #        print 'url',url
+        #keyboard = xbmc.Keyboard('','Search[Use one syllable only;no space]')
+        #keyboard.doModal()
+        #if not (keyboard.isConfirmed() == False):
+        #        newStr = keyboard.getText()
+        #        if len(newStr) == 0 :
+        #deg()
+        #keyboard = xbmc.Keyboard('sort=new&t=week&q=', "Search %s" %url)
+        #keyboard.doModal()
         pluginquerybyJSON(url)
+        
 
 def addDir(name,url,mode,itemart,item_info,regexs=None,reg_url=None):
         fanart = itemart.get('fanart') or FANART
@@ -3099,12 +3106,14 @@ def sendJSON( command):
     return uni(data)
 
 def pluginquerybyJSON(queryurl,give_me_result=None,addtoplaylist=False):
+
     #xbmc.log("playlist: %s" %url)
     if 'audio' in queryurl:
         json_query = uni('{"jsonrpc":"2.0","method":"Files.GetDirectory","params": {"directory":"%s","media":"video", "properties": ["title", "album", "artist", "duration","thumbnail", "year"]}, "id": 1}') %queryurl
     else:
         json_query = uni('{"jsonrpc":"2.0","method":"Files.GetDirectory","params":{"directory":"%s","media":"video","properties":[ "plot","playcount","director", "genre","votes","duration","trailer","premiered","thumbnail","title","year","dateadded","fanart","rating","season","episode","studio","mpaa"]},"id":1}') %queryurl
     json_folder_detail = json.loads(sendJSON(json_query))
+  
     #print json_folder_detail
     if give_me_result:
         return json_folder_detail
@@ -3553,6 +3562,7 @@ def checkfile(epgfilewithreg,timeforfileinsec):
             return False
 #@LS_CACHE_getepgcontent
 def getepgcontent(epg,getnew=False):
+    extracted_dir = None
     if epg and isinstance(epg, basestring):
         url=epglink=epg
         epgfile = "0"
@@ -3568,29 +3578,29 @@ def getepgcontent(epg,getnew=False):
         xbmcvfs.mkdir(LivewebTVepg)
     if not epgfile == "0":
         filename = os.path.join(LivewebTVepg,cacheKey(url))
+        
         extracted_dir = os.path.join(LivewebTVepg,cacheKey(url)+'_extracted')#dir
-          
-        epgxml = os.path.join(extracted_dir,epgfile)
-        epgfilewithreg = os.path.join(extracted_dir,cacheKey(epgxml)+'.json')
-    
-                    
+
     else:
-        epgfilewithreg = os.path.join(LivewebTVepg,cacheKey(url)+'.json')
         if "\\" in url:
             epgxml = url
         else:
-            epgxml = os.path.join(LivewebTVepg,cacheKey(url))
-        
+            #epgxml = os.path.join(LivewebTVepg,cacheKey(url))
+            filename = os.path.join(LivewebTVepg,cacheKey(url))
+    epgfilewithreg = os.path.join(LivewebTVepg,cacheKey(url)+'.json')    
     if getnew:
         os.remove(epgfilewithreg)
     if os.path.isfile(epgfilewithreg):
         return epgfilewithreg
-    elif not "\\" in url:
-        if not epgfile == "0":
-            
-            down_url(url,filename,_out=extracted_dir)
-        else:
-            down_url(url,epgxml)        
+    elif not "\\" in url :
+           
+            epgxml = down_url(url,filename)
+            ItsZip = contentfromZip(epgxml,extracted_dir)
+            if ItsZip:
+                if os.path.isdir(ItsZip) and not epgfile == "0":
+                    epgxml = os.path.join(ItsZip,epgfile)
+                   
+       
     # file is ready check cache 
     return epg_source_toregfile(epgxml,epgtimeformat,epgfilewithreg)
 
