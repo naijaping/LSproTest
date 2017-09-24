@@ -1,0 +1,239 @@
+    <channel>
+<name>CBC TV</name>
+<thumbnail>http://www.burlingtongazette.ca/wp-content/uploads/CBC-logo.jpg</thumbnail>
+<fanart>http://www.burlingtongazette.ca/wp-content/uploads/CBC-logo.jpg</fanart>
+<items>
+<item>
+<title>CBC </title>
+<link>dd</link>
+<externallink><![CDATA[
+###LSPRODYNAMIC###
+from _lspro  import *
+uqp = urllib.unquote_plus
+qp = urllib.quote_plus
+import bs4
+from bs4 import BeautifulSoup as BS4
+mainURL = 'https://api-cbc.cloud.clearleap.com/cloffice/client/web/browse/'
+tokenfile = xbmc.translatePath(os.path.join(profile, 'request_api_deviceid_token'))
+link = "$pyFunction:LSProdynamicCode.getAddonCats(\"%s\")"
+Videolink = "$pyFunction:LSProdynamicCode.make_requests(\"%s\")"
+nx_link = "$pyFunction:LSProdynamicCode.GetLSProData(\"%s\",\"\",\"\")"
+
+import HTMLParser
+h = HTMLParser.HTMLParser()
+def GetLSProData(page_data,Cookie_Jar,m):
+   data = makeRequest(mainURL)
+
+
+   soup= BS4(data,"html.parser")('channel')
+   for item in soup[0]('item'):
+        item_info = {}
+        itemart = {}
+        link2 =  item.link
+        if not link2:
+            continue
+        title =  item.title.text.encode("utf-8","ignore")
+        item_info['genre'] = item.get('category') or item.get('clearleap:itemtype')
+        xbmc.log("cbc:title:%s" %title,xbmc.LOGNOTICE)
+        if title == 'Search':
+            link2=link2.text.encode("utf-8","ignore").replace("search","suggest") + "?max=40&offset=0&query="
+            addDir(title,link %link2, '1', itemart, item_info)
+            continue
+        addDir(title,link %link2.text.encode("utf-8","ignore"), '1', itemart, item_info)
+   if xbmc.getCondVisibility("System.HasAddon(plugin.video.cbcnews)"):
+        
+        addDir("CBC News [need plugin]",link %('cbcnews'),'1',{},{})
+        #xbmc.executebuiltin('XBMC.RunPlugin(plugin.video.cbcnews)')
+def getAddonCats(lurl):
+    link = "$pyFunction:LSProdynamicCode.getAddonCats(\"%s\")"
+    
+    if lurl == 'cbcnews' :
+        #xbmc.executebuiltin('XBMC.Container.Update(plugin://plugin.video.cbcnews/)') #once in plugin cant back to root
+        #xbmc.executebuiltin('XBMC.RunPlugin(plugin://plugin.video.cbcnews/)') #no dir
+        xbmc.executebuiltin('ActivateWindow(10025,"plugin://plugin.video.cbcnews/",return)')
+    else:    
+        if not '://' in lurl:
+            lurl = mainURL + lurl   
+
+
+        itemart = {}   
+        infoList = {}
+        if '/suggest/' in lurl:
+            keyboard = xbmc.Keyboard('','Search CBC')
+            keyboard.doModal()
+            if not (keyboard.isConfirmed() == False):
+                    newStr = keyboard.getText()
+                    if len(newStr) == 0 :
+                        return 
+            lurl = lurl + qp(newStr)
+        data  = makeRequest(lurl)
+        soup= BS4(data,"html.parser")('channel')    #[0]('item')
+       #if 'media:content' in html:
+        
+      
+        mediacontent = soup[0]('item')[0]('media:content')
+        if mediacontent:
+            print mediacontent
+            fanart = soup[0].find("media:thumbnail",attrs={"profile":"CBC-HERO-3X"})
+            if fanart :
+                itemart['fanart'] =    fanart.get("url")
+            genre =  soup[0]('category')
+            if genre:
+                
+                infoList['genre'] = genre[0].text
+            for item in soup[0]('item'):
+                    title =  item.title.text.encode("utf-8","ignore")
+                    nxurl = item('media:content')
+                    if nxurl :
+                        nxurl =  nxurl[0].get('url')
+                    else:
+                        continue
+                    thumb = item("media:thumbnail",attrs={"profile":"CBC-POSTER-2X"})
+                    if thumb:
+                       itemart['thumb'] = thumb[0].get("url")
+                    plot = item.description
+                    if plot:
+                        try:    infoList['Plot'] = h.unescape(plot.text.encode('utf-8'))
+                        except: infoList['Plot'] = h.unescape(plot.text)
+                    infoList['TVShowTitle'] = item('clearleap:series')[0].text or title
+                    infoList['Title'] = title
+                    try:
+                        #infoList['tagline'] = item('clearleap:shorttitle')[0].text or ''
+                        infoList['season'] = int(item('clearleap:season')[0].text) 
+                        infoList['episode'] = int(item('clearleap:episodeinseason')[0].text)
+                    except:
+                        pass
+                    
+                    credit = item('media:credit')
+                    try:
+                        for cc in credit:
+                            if cc.get('role') == 'year':
+                                infoList['year'] =  cc.text
+                            if cc.get('role') == 'actor':
+                                infoList['actor'] = cc.text
+                    except:
+                        pass
+                    addLink(Videolink %nxurl,title,itemart,infoList)
+                    
+                    
+        else:
+            for item in soup[0]('item'):
+                title =  item.title.text.encode("utf-8","ignore")
+                shortcuttoguid =  item('clearleap:shortcuttoguid')
+                if shortcuttoguid:
+                    guid = shortcuttoguid[0].text
+                elif item.guid:
+                    guid = item.guid.text
+                else:
+                    
+                    xbmc.log("No guid found for :%s" %title, level=xbmc.LOGNOTICE)
+                    continue
+                nxurl = "%s%s" %('https://api-cbc.cloud.clearleap.com/cloffice/client/web/browse/',guid)
+                thumb = item("media:thumbnail",attrs={"profile":"CBC-HERO-3X"})
+                if thumb:
+                    itemart['thumb'] = itemart['fanart'] = thumb[-1].get('url')
+                plot = item.description
+                if plot:
+                    try:    infoList['Plot'] = h.unescape(plot.text.encode('utf-8'))
+                    except: infoList['Plot'] = h.unescape(plot.text)            
+
+                if title == "All" :
+                    addDir(title,link %(nxurl+"?offset=0&max=30"), '1', itemart, infoList)
+                    continue
+                addDir(title,link %nxurl, '1', itemart, infoList)
+            if  "?offset=" in lurl:
+                import urlparse
+                path = dict(urlparse.parse_qsl(lurl.split('?',1)[1]))
+                lurl =lurl.split('?',1)[0] + "?offset=" +str(int(path.get('offset')) +30) + "&max=30"
+
+                addDir("Next>> 30",link %(lurl), '1', itemart, infoList)
+
+def make_requests(url):
+    response = [None]
+    responseText = None
+    if checkfile(tokenfile,24*2*60*60):
+        data = open(tokenfile).read().split('\n')
+        deviceId = data[0]
+        deviceToken = data[1]
+    else:    
+        if(request_api_deviceid_token(response)):
+            responseText = response[0]
+
+
+            try:
+                deviceId = re.compile(r'<deviceId>(.+?)<',re.DOTALL).findall(responseText)[0]
+                deviceToken = re.compile(r'<deviceToken>(.+?)<',re.DOTALL).findall(responseText)[0]
+                with open(tokenfile, 'w') as outfile: #SAVE TOKEN FOR A DAY
+                    outfile.write(deviceId+'\n'+deviceToken+'\n')
+            except:
+                return
+        else:
+            xbmc.log("[addon.live.cbcplayertest-%s]: %s" %('No deviceId or token found', 'Abortingg!!!'),xbmc.LOGNOTICE)
+            return
+    if(request_api_cbc_cloud_clearleap_com(response,url,deviceId,deviceToken)):
+        responseText = read_response(response[0])
+
+        response[0].close()
+        url = re.compile(r'<url>(.+?)<',re.DOTALL).findall(responseText)[0] 
+        return url
+    return
+def read_response(response):
+    if response.info().get('Content-Encoding') == 'gzip':
+        import gzip
+        from StringIO import StringIO
+        buf = StringIO(response.read())
+        return gzip.GzipFile(fileobj=buf).read()
+
+    elif response.info().get('Content-Encoding') == 'deflate':
+        import zlib
+        decompress = zlib.decompressobj(-zlib.MAX_WBITS)
+        inflated = decompress.decompress(response.read())
+        inflated += decompress.flush()
+        return inflated
+
+    return response.read()
+
+
+def request_api_cbc_cloud_clearleap_com(response,url,deviceId,deviceToken):
+    response[0] = None
+
+    try:
+        req = urllib2.Request(url)
+
+        req.add_header("User-Agent", "Mozilla/5.0 (iPhone; CPU iPhone OS 8_3 like Mac OS X) AppleWebKit/600.1.4 (KHTML, like Gecko) Version/8.0 Mobile/12F70 Safari/600.1.4")
+        req.add_header("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8")
+        req.add_header("Accept-Language", "en-GB,en;q=0.5")
+        req.add_header("Accept-Encoding", "gzip, deflate, br")
+        req.add_header("X-Clearleap-DeviceId", deviceId)
+        req.add_header("X-Clearleap-DeviceToken", deviceToken)
+        req.add_header("Referer", "http://watch.cbc.ca/the-nature-of-things/season-54/episode-9/38e815a-00918982176")
+        req.add_header("Origin", "http://watch.cbc.ca")
+
+        response[0] = urllib2.urlopen(req)
+
+    except urllib2.URLError, e:
+        if not hasattr(e, "code"):
+            return False
+        response[0] = e
+    except:
+        return False
+
+    return True
+
+def request_api_deviceid_token(response):            
+    response[0] = None
+    import requests # post request of xml data is problematic
+
+    try:
+        body = """<device><type>web</type></device>"""
+        headers={"User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 8_3 like Mac OS X) AppleWebKit/600.1.4 (KHTML, like Gecko) Version/8.0 Mobile/12F70 Safari/600.1.4","Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8","Accept-Language": "en-GB,en;q=0.5","Accept-Encoding": "gzip, deflate, br","Content-Type": "application/xml","Referer": "http://watch.cbc.ca/the-nature-of-things/season-54/episode-9/38e815a-00918982176"}
+        r=requests.post("https://api-cbc.cloud.clearleap.com/cloffice/client/device/register",data=body,headers=headers,verify=False)
+        response[0] = r.text
+    except:
+        return False
+    return True            
+]]></externallink>
+
+</item>
+</items>
+</channel>
