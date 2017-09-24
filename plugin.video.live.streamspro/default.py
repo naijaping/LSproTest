@@ -1,7 +1,7 @@
 
 import _lspro
 import urlparse,sys,urllib,xbmc,xbmcplugin,xbmcaddon,traceback
-
+import time
 g_ignoreSetResolved=['plugin.video.dramasonline','plugin.video.f4mTester','plugin.video.shahidmbcnet','plugin.video.SportsDevil','plugin.stream.vaughnlive.tv','plugin.video.ZemTV-shani']
 
 
@@ -127,8 +127,11 @@ elif mode==1:
             url=data
             data=None
         #create xml here
-    _lspro.getData(url,fanart,data)
-    xbmcplugin.endOfDirectory(int(sys.argv[1]))
+    ss=_lspro.getData(url,fanart,data)
+    #deg("ssssssssssssssss")
+    #deg(ss)
+    if not ss:
+        xbmcplugin.endOfDirectory(int(sys.argv[1]))
 
 
 elif mode==2:
@@ -193,33 +196,61 @@ elif mode==11:
 elif mode==12:
     #addon_log("setResolvedUrl")
     if url.startswith("$pyFunction:"):
-        #xbmc.log("$pyFunction in mode 12 Test",xbmc.LOGNOTICE)
         url = _lspro.Func_in_externallink(url)
-        #if stream_url:
-        #    playsetresolved(stream_url,name,itemart,item_info,True)
-        #else:
-        #    xbmc.executebuiltin("XBMC.Notification(LiveStreamsPro,Finding stream_url for pyFunction failed ,1000,"")")         
-    
-    if not url.startswith("plugin://plugin") or not any(x in url for x in g_ignoreSetResolved):#not url.startswith("plugin://plugin.video.f4mTester") :
-        setres=True
-        if '$$LSDirect$$' in url:
-            url=url.replace('$$LSDirect$$','')
-            setres=False
-        import xbmcgui
-        item = xbmcgui.ListItem(path=url)
-        if not setres:
-            xbmc.Player().play(url)
-        else: 
-            xbmcplugin.setResolvedUrl(int(sys.argv[1]), True, item)
-    
-    else:
-#        print 'Not setting setResolvedUrl'
-        xbmc.executebuiltin('XBMC.RunPlugin('+url+')')
-
+    if url.startswith("plugin://plugin.video.youtube") and not '?video_id' in url:
+        deg("updating youtube container")
+        xbmc.executebuiltin('Container.Update(%s,return)' %url)
+    elif ".mpd" in url:
+            import xbmcgui
+            item = xbmcgui.ListItem(name)
+            deg("setting mPPPPPPPPPPPDDDDDDDDD")
+            item.setProperty('inputstreamaddon', 'inputstream.adaptive')
+            item.setProperty('inputstream.adaptive.manifest_type', 'mpd')  
+            item.setProperty(u'IsPlayable', u'true')
+            #xbmcplugin.setResolvedUrl(int(sys.argv[1]), True, item)
+            xbmc.Player().play(url,item)
+            xbmc.sleep(1000)
+    if  not xbmc.Player().isPlaying():
+        if not url.startswith("plugin://plugin") or not any(x in url for x in g_ignoreSetResolved):#not url.startswith("plugin://plugin.video.f4mTester") :
+            setres=True
+            if '$$LSDirect$$' in url:
+                url=url.replace('$$LSDirect$$','')
+                setres=False
+            import xbmcgui
+            item = xbmcgui.ListItem(path=url)
+          
+            if not setres:
+                xbmc.Player().play(url,item)
+            else: 
+                xbmcplugin.setResolvedUrl(int(sys.argv[1]), True, item)
+        
+        elif "playlist" in url:
+            deg('tRYING TO PLAY PLAYLIST %s' %url) 
+            #xbmc.executebuiltin('playlist.playoffset(video,0)')
+        else:
+            deg('Not setting setResolvedUrl for %s' %url) 
+            xbmc.executebuiltin('XBMC.RunPlugin('+url+')')
+        #xbmc.executebuiltin('Container.Update('+url+')')
+        #xbmc . executebuiltin ( "PlayMedia(%s)" % url )
+		
+#"Show a image before you play video. It will activate \"FullScreenVideo\" then play your video."    
+   
+    #xbmc.executebuiltin('ActivateWindow(12005)') 
+    #deg("we are here....")
+    #pic = xbmc.executebuiltin('ShowPicture("%s")'%("https://yt3.ggpht.com/-1kCe6rbK_DQ/AAAAAAAAAAI/AAAAAAAAAAA/_jT-RboE2cY/s100-c-k-no-mo-rj-c0xffffff/photo.jpg"))
+    #time.sleep(4.5)
+    #xbmc.executebuiltin('Action(back)') 
+    #time.sleep(1.0)
 
 elif mode==13:
+    if not playlist:
+        playlist = xbmc.PlayList(xbmc.PLAYLIST_VIDEO)
+        xbmc.Player().play()
+        #xbmc.executebuiltin('Playlist.PlayOffset(0)')
     #addon_log("play_playlist")
-    _lspro.play_playlist(name, playlist,itemart=itemart,item_info=item_info)
+        #xbmc.Player().play(xbmc.PlayList(xbmc.PLAYLIST_VIDEO))
+    else:
+        _lspro.play_playlist(name, playlist)
 
 elif mode==14:
     #addon_log("get_xml_database")
@@ -274,9 +305,13 @@ elif mode==25:
     xbmcplugin.endOfDirectory(int(sys.argv[1]))
 elif mode==26: # whats on today EPG
     path = xbmc.getInfoLabel('ListItem.FileNameAndPath')
-    xbmc.log(str(path),xbmc.LOGNOTICE)
+    
     path = dict(urlparse.parse_qsl(path.split('?',1)[1]))
-    url,tvgurl,epgfile,offset = path.get('url'),path.get('tvgurl'),path.get('epgfile'),path.get('offset')
+    xbmc.log(str(path),xbmc.LOGNOTICE)
+    from _lspro import epgxml_db
+    
+    #url,tvgurl,epgfile,offset = path.get('url'),path.get('tvgurl'),path.get('epgfile'),path.get('offset')
+    epgxml_db().onedayepg(name,path.get('url'))
     xbmcplugin.endOfDirectory(int(sys.argv[1]))
    
 elif mode==55:
@@ -304,7 +339,10 @@ elif mode==53:
     #addon_log("Requesting JSON-RPC Items")
     _lspro.pluginquerybyJSON(url)
 elif mode==54:
+
+    deg([xbmc.getInfoLabel('ListItem.TVShowTitle'),xbmc.getInfoLabel('ListItem.Season'),xbmc.getInfoLabel('ListItem.Episode'),xbmc.getInfoLabel('ListItem.StartTime'),xbmc.getInfoLabel('ListItem.Label2')])
     tvshowname = xbmc.getInfoLabel('ListItem.TVShowTitle').split(":")[0]
+    deg(tvshowname)
     if not tvshowname:
         tvshowname = xbmc.getInfoLabel('ListItem.Title')
     
@@ -313,15 +351,16 @@ elif mode==54:
     season = xbmc.getInfoLabel('ListItem.Season')
     episode = xbmc.getInfoLabel('ListItem.Episode')
     genre = xbmc.getInfoLabel('ListItem.genre')
+    deg(genre)
     if genre:
         all_genre = [i.lower().replace(" ","") for i in genre.split(",") if i]
     if season or episode:
-        url = 'http://api-v2launch.trakt.tv/search?type=show&limit=20&page=1&query=' + urllib.quote_plus(tvshowname)
+        url = 'http://api.trakt.tv/search/show?limit=20&page=1&query=' + urllib.quote_plus(tvshowname)
         url = '%s?action=tvshowPage&url=%s' % ("plugin://plugin.video.exodus/", urllib.quote_plus(url))
         _lspro.pluginquerybyJSON(url)
 
     elif genre and any( i in ["movie","film"]  for i in all_genre):
-        url = 'http://api-v2launch.trakt.tv/search?type=movie&limit=20&page=1&query=' + urllib.quote_plus(tvshowname)
+        url = 'http://api.trakt.tv/search/movie?limit=20&page=1&query=' + urllib.quote_plus(tvshowname)
         #going back dont work b/c query is empty
         url = '%s?action=moviePage&url=%s' % ("plugin://plugin.video.exodus/", urllib.quote_plus(url))
         _lspro.pluginquerybyJSON(url)
@@ -336,9 +375,26 @@ elif mode==60:
         _lspro.search_lspro_source(url)
     else:
         _lspro.search_lspro_source()
+elif mode==61:
+    #addon_log("Requesting JSON-RPC Items")
+    _lspro.sdevil()
+
+elif mode==65:
+    #addon_log("Requesting JSON-RPC Items")
+    _lspro.update_livestreamer()
+
 elif mode==1899:
     #addon_log("Requesting JSON-RPC Items")
     _lspro.pluginquerybyJSON(url, addtoplaylist=True)
-if xbmc.getCondVisibility("Player.HasMedia") and xbmc.Player().isPlaying()and plot:    
+elif mode == 1915:
+        if url is None or url == "" or url == "NewSearch":
+            _lspro.Search_onGoogle(url)
+            
+        else:
+            _lspro.Search_onGoogle_result(url)
+        xbmcplugin.endOfDirectory(int(sys.argv[1]))    
+    
+if xbmc.getCondVisibility("Player.HasMedia") and xbmc.Player().isPlaying()and plot:
+    #deg("Spikeeeeeeeeeeeeeeee")
     _lspro.ShowOSDnownext()
  
