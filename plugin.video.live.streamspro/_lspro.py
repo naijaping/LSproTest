@@ -109,34 +109,14 @@ if REMOTE_DBG:
         sys.stderr.write("Error: " +
             "You must add org.python.pydev.debug.pysrc to your PYTHONPATH.")
         sys.exit(1)
-def getRndUA():
-    ua="Mozilla/5.0 (Linux; Android 5.1; en-US; Nexus 6 Build/LMY47Z) "+("MX Player/%s.%s.%s"%(binascii.b2a_hex(os.urandom(2))[:2],binascii.b2a_hex(os.urandom(2))[:2],binascii.b2a_hex(os.urandom(2))[:3]))
-    return ''.join(random.sample(set(ua.split(' ')), 3))        
+    
 def addon_log(string,level=xbmc.LOGNOTICE):
     if debug == 'true':
         try:
             xbmc.log("[addon.live.streamspro-%s]: %s" %('addon_version', string),level)
         except:
             pass
-def date_strto_localtime(date_str,epgtimeformat = "%Y%m%d%H%M%S",my_timezone=150):
-    import pytz
-#try:datetime.datetime(*(time.strptime(input, epgtimeformat)[0:6]))
-    notimezone=datetime.datetime(*(time.strptime(now.strftime("%Y%m%d") + date_str.split(":")[0]+date_str.split(":")[1],epgtimeformat)[0:6]))
-    db_time = pytz.timezone(str(pytz.timezone("Etc/UTC"))).localize(notimezone)
-    if isinstance(my_timezone, int):
-        my_location=pytz.timezone(pytz.all_timezones[int(my_timezone)])
-    else:
-        my_location=pytz.timezone(my_timezone)
-    print my_location
-    converted_time=db_time.astimezone(my_location)
-    print converted_time
-    starttime=converted_time.strftime("%H:%M")
-    print starttime
-    return starttime
-    #item.setProperty('starttime',starttime)
-#except Exception, e:
-    #xbmc.log(msg="[Match Center] Exception: %s" % (str(e)), level=xbmc.LOGDEBUG)
-    
+
 if os.path.exists(favorites)==True:
     FAV = open(favorites).read()
 else: FAV = []
