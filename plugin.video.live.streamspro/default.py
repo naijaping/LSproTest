@@ -1,5 +1,6 @@
 
 import _lspro
+
 import urlparse,sys,urllib,xbmc,xbmcplugin,xbmcaddon,traceback
 import time
 g_ignoreSetResolved=['plugin.video.dramasonline','plugin.video.f4mTester','plugin.video.shahidmbcnet','plugin.video.SportsDevil','plugin.stream.vaughnlive.tv','plugin.video.ZemTV-shani']
@@ -195,6 +196,9 @@ elif mode==11:
 
 elif mode==12:
     #addon_log("setResolvedUrl")
+    #if url.endswith((".mkv",".m3u8",".ts",".f4m",".flv",".mp4",".avi",".mp3")) or "?wmsAuthSign=" in url or url.startswith("rtmp"):
+    #_lspro.urlresolvers(url).resolve()
+    
     if url.startswith("$pyFunction:"):
         url = _lspro.Func_in_externallink(url)
     if url.startswith("plugin://plugin.video.youtube") and not '?video_id' in url:
@@ -203,7 +207,6 @@ elif mode==12:
     elif ".mpd" in url:
             import xbmcgui
             item = xbmcgui.ListItem(name)
-            deg("setting mPPPPPPPPPPPDDDDDDDDD")
             item.setProperty('inputstreamaddon', 'inputstream.adaptive')
             item.setProperty('inputstream.adaptive.manifest_type', 'mpd')  
             item.setProperty(u'IsPlayable', u'true')
@@ -211,11 +214,22 @@ elif mode==12:
             xbmc.Player().play(url,item)
             xbmc.sleep(1000)
     if  not xbmc.Player().isPlaying():
+        
         if not url.startswith("plugin://plugin") or not any(x in url for x in g_ignoreSetResolved):#not url.startswith("plugin://plugin.video.f4mTester") :
             setres=True
             if '$$LSDirect$$' in url:
                 url=url.replace('$$LSDirect$$','')
                 setres=False
+            if url.endswith((".mkv",".m3u8",".ts",".f4m",".flv",".mp4",".avi",".mp3")) or "?wmsAuthSign=" in url or ".m3u8?" in url or url.startswith("rtmp")or url.startswith("plugin://"):            
+                url = url
+            else:    
+                deg("checking urlresolvers database for the url")
+                UR = _lspro.urlresolvers(url)
+                if UR.resolveable():
+                    deg('tRYING TO urlresolvers %s' %url) 
+                    url = UR.resolve()
+            
+            
             import xbmcgui
             item = xbmcgui.ListItem(path=url)
           
@@ -224,8 +238,8 @@ elif mode==12:
             else: 
                 xbmcplugin.setResolvedUrl(int(sys.argv[1]), True, item)
         
-        elif "playlist" in url:
-            deg('tRYING TO PLAY PLAYLIST %s' %url) 
+
+
             #xbmc.executebuiltin('playlist.playoffset(video,0)')
         else:
             deg('Not setting setResolvedUrl for %s' %url) 
@@ -275,14 +289,11 @@ elif mode==17 or mode==117:
 
 elif mode==18:
     #addon_log("youtubedl")
-    try:
-        import youtubedl
-    except Exception:
-        xbmc.executebuiltin("XBMC.Notification(LiveStreamsPro,Please [COLOR yellow]install Youtube-dl[/COLOR] module ,10000,"")")
-    stream_url=youtubedl.single_YD(url)
+  
+
+    stream_url=_lspro.ytdl(url)
     _lspro.playsetresolved(stream_url,name)
 elif mode==19:
-    #addon_log("Genesiscommonresolvers")
 
     from _lspro import urlsolver
     sol_url = urlsolver(url)

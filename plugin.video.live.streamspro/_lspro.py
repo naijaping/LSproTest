@@ -37,11 +37,7 @@ epgtimeformat2 = "%Y-%m-%d %H:%M:%S"
 epgtimeformat = "%Y%m%d%H%M%S"
 GUIDE={}
 now = datetime.datetime.now().replace(microsecond=0)
-from resources.lib import pyfscache
-LS_CACHE_urlsolver = pyfscache.FSCache(xbmc.translatePath("special://temp/"),seconds=3600)
 
-LS_CACHE_ALLUrlResolver = pyfscache.FSCache(xbmc.translatePath("special://temp/"),seconds=10*24*3600)
-LS_CACHE_ytdl_domain = pyfscache.FSCache(xbmc.translatePath("special://temp/"),seconds=100*3600)
 g_ignoreSetResolved=['plugin.video.dramasonline','plugin.video.f4mTester','plugin.video.shahidmbcnet','plugin.video.SportsDevil','plugin.stream.vaughnlive.tv','plugin.video.ZemTV-shani']
 art_tags = ['thumbnail', 'fanart', 'poster','clearlogo','banner','clearart']
 info_tags = ['director' ,'season','episode', 'writer','date', 'info', 'rating', 'studio', 'source','genre','plotoutline','credits','dateadded','tagline',"tvshowtitle","label"]
@@ -697,34 +693,6 @@ def deg(string,level=xbmc.LOGNOTICE):
         except:
             traceback.print_exc()
             pass
-@LS_CACHE_ALLUrlResolver
-def ALLUrlResolver():
-    from urlresolver.resolver import UrlResolver
-    classes = UrlResolver.__class__.__subclasses__(UrlResolver) 
-    allurlsolvedomains = []
-    [allurlsolvedomains.append(res_domain.lower()) for resolver in classes for res_domain in resolver.domains]
-        
-            
-    return allurlsolvedomains 
-@LS_CACHE_ytdl_domain
-def YTDL_domain_check(hostname):
-    try:
-        YTdl = True
-        from YDStreamExtractor import getVideoInfo # import this first. it will add profile youtube-dl to sys 
-        import youtube_dl
-        from youtube_dl import extractor as _EX
-        extractors= _EX.list_extractors('18') # cache that
-        names=list(set([extractor.IE_NAME.lower() \
-                        for extractor in extractors if not extractor.IE_NAME == 'generic']))
-        if not any(((name in hostname) or (hostname in name)) for name in names):
-            xbmc.log("This hostname nof found in Youtube-dl module: %s" %hostname, xbmc.LOGNOTICE)
-            raise        
-        
-    except Exception:
-        YTdl = False
-
-        xbmc.executebuiltin("XBMC.Notification(LiveStreamsPro,Hostname not found in Youtube-dl module,5000,"")")
-    return YTdl
 
 def parse_m3u(data, url=None, g_name=None):
     content = data.strip()
@@ -1001,8 +969,8 @@ def getItems(item,fanart,itemart={},item_info={},total=1,dontLink=False):
                                 #print 'referer found'
                                 sportsdevil = sportsdevil + '%26referer=' +referer
                             url.append(sportsdevil)
-                elif len(item('yt-dl')) >0:
-                    for i in item('yt-dl'):
+                elif len(item('ytdl')) >0:
+                    for i in item('ytdl'):
                         if not i.string == None:
                             ytdl = i.string + '&in_mode=18'
                             url.append(ytdl)
@@ -2618,8 +2586,44 @@ def rmFavorite(name):
                 break
         xbmc.executebuiltin("XBMC.Container.Refresh")
 
-@LS_CACHE_urlsolver    
 def urlsolver(url):
+    import urlresolver
+    host = urlresolver.HostedMediaFile(url)
+    stream_url = None
+    if host:
+            stream_url = host.resolve()
+            if not (stream_url and isinstance(stream_url, basestring)):
+                return
+            #if stream_url and isinstance(stream_url, basestring):
+            return stream_url 
+def ytdl(url):
+    try:
+        from YDStreamExtractor import getVideoInfo
+    except Exception:
+        xbmc.executebuiltin("XBMC.Notification(LiveStreamsPro,Please [COLOR yellow]install Youtube-dl[/COLOR] module ,10000,"")")
+        return
+    info=getVideoInfo(url)
+    if info:
+        for s in info.streams():
+                #try:
+                    stream_url = s['xbmc_url'].encode('utf-8','ignore')
+                    itemart['thumb'] = s.get('thumbnail')
+                    itemart['info'] = s['ytdl_format'].get('description').encode('utf-8','ignore')
+                    addon_log("[STREAMURL FOUND FROM YTDL-%s]: %s" %('YOUTUBEDL', str(stream_url)))
+                    if '.f4m' in stream_url:
+                        if re.search('''foodnetwork''',stream_url):
+                            stream_url=stream_url.replace('|User-Agent','&hdcore=2.11.3&g=OCVKSKWGMWCF|User-Agent')
+                        stream_url= 'plugin://plugin.video.f4mTester/?url=' + urllib.quote_plus(stream_url)
+                    elif re.search('''watch\?v=''',stream_url) :
+                        uid = re.compile(utubeid,re.DOTALL).findall(stream_url)[0]
+                        stream_url= 'plugin://plugin.video.youtube/play/?video_id=' + uid
+                    elif stream_url:
+                        stream_url= stream_url
+    #else:                #return stream_url
+        #    return
+    if stream_url:
+        return stream_url            
+def urlsolver_deprecated(url):
     import urlresolver
     host = urlresolver.HostedMediaFile(url)
     stream_url = None
@@ -3150,11 +3154,8 @@ def addLink(url,name,itemart={},item_info={},regexs=None,total=1,setCookie=""):
         ok = True
         isFolder=False
 
-        NoturlResolver=False
         mode = '12'
-        if url.endswith((".mkv",".m3u8",".ts",".f4m",".flv",".mp4",".avi",".mp3")) or "?wmsAuthSign=" in url or url.startswith("rtmp"):
             
-            NoturlResolver = True
             
         if regexs:
             mode = '17'
@@ -3187,15 +3188,15 @@ def addLink(url,name,itemart={},item_info={},regexs=None,total=1,setCookie=""):
         elif 'youtube' in url and 'watch?v=' in url:
             url = 'plugin://plugin.video.youtube/play/?video_id=' + re.compile('v(?:=|%3D)([0-9A-Za-z_-]{11})',re.I).findall(url)[0]
             mode = '12'
-        elif  not NoturlResolver and not isinstance(url,list):
-            #deg("check domain in urlresolver")
-                
-            domain = __top_domain(url)
-            alldomains_from_urlresolver = ALLUrlResolver()
-            #deg(alldomains_from_urlresolver)
-            if domain in alldomains_from_urlresolver:
-                deg("domain %s found in ALLUrlResolver" %domain)
-                mode = '19'
+        #elif  not NoturlResolver and not isinstance(url,list):
+        #    #deg("check domain in urlresolver")
+        #        
+        #    domain = __top_domain(url)
+        #    alldomains_from_urlresolver = ALLUrlResolver()
+        #    #deg(alldomains_from_urlresolver)
+        #    if domain in alldomains_from_urlresolver:
+        #        deg("domain %s found in ALLUrlResolver" %domain)
+        #        mode = '19'
             #
         if mode == "12" or mode == "19":
             if xbmc.getCondVisibility("Player.HasMedia"):
@@ -3602,7 +3603,107 @@ def getepgcontent(epg,replacefile=False):
                 elif os.path.isfile(ItsZip):
                     return ItsZip
                 
- 
+class urlresolvers():
+    def __init__(self,url):
+
+        try:
+            from sqlite3 import dbapi2 as database
+        except:
+            from pysqlite2 import dbapi2 as database
+        self.url = url   
+        self.supported_plugins=[]
+        self.now = datetime.datetime.now().replace(microsecond=0)
+
+        self.databasePath = os.path.join(profile, 'lspro_urlresolvers.db')
+        self.dbcon = database.connect(self.databasePath)
+        self.c = self.dbcon.cursor()  
+        self.c.execute('CREATE TABLE IF NOT EXISTS up_source(source_id TEXT, title TEXT, url TEXT,last_updated TIMESTAMP, PRIMARY KEY (source_id))') #
+        self.c.execute('CREATE TABLE IF NOT EXISTS urlresolvers(resolver TEXT, pattern TEXT,supported_plugins TEXT, blacklisted TEXT)') #
+    def resolveable(self):
+        up_source=self.c.execute("SELECT last_updated from up_source")
+        up_source = up_source.fetchone()
+        deg(up_source)
+        
+        if not up_source or int(time.mktime(time.strptime(up_source[0], epgtimeformat2)))+(15*24*60*60) >= int(time.time()):
+            self.ALLUrlResolver()
+            self.YTDL_domain_check()
+
+
+        deg(self.top_domain(self.url))
+        supported_plugins=self.c.execute("SELECT supported_plugins from urlresolvers WHERE resolver=?",[self.top_domain(self.url)])
+        supported_plugins = supported_plugins.fetchone()
+        deg(supported_plugins)
+        if supported_plugins:
+            self.supported_plugins= supported_plugins
+        return self.supported_plugins
+    def top_domain(self,url):           
+        elements = urlparse.urlparse(url)
+        domain = elements.netloc or elements.path
+        domain = domain.split('@')[-1].split(':')[0]
+        regex = "(\w{2,}\.\w{2,3}\.\w{2}|\w{2,}\.\w{2,3})$"
+        res = re.search(regex, domain)
+        if res:
+            domain = res.group(1)
+        domain = domain.lower()
+        return domain
+    def resolve(self):
+            #if "," in supported_plugins[0]:
+                u=None
+                for i in self.supported_plugins[0].split(","):
+                    if i == "urlresolver":
+                        u= urlsolver(self.url)
+                    if i == "youtube-dl":
+                        u= ytdl(self.url)
+                    if u:
+                        return u
+    def ALLUrlResolver(self):
+        from urlresolver.resolver import UrlResolver
+        classes = UrlResolver.__class__.__subclasses__(UrlResolver) 
+        self.allurlsolvedomains = []
+        for resolver in classes:
+             for res_domain in resolver.domains:
+                if res_domain.lower():
+                
+                    self.c.execute('INSERT OR IGNORE INTO urlresolvers(resolver , pattern ,supported_plugins , blacklisted ) VALUES( ?, ?, ?, ?)', [res_domain.lower(), res_domain.lower(),  "urlresolver", "n"]) 
+                self.allurlsolvedomains.append(res_domain.lower())
+        #[allurlsolvedomains.append(res_domain.lower()) for resolver in classes for res_domain in resolver.domains]
+        self.c.execute('INSERT OR IGNORE INTO up_source(source_id , title ,url , last_updated ) VALUES( ?, ?, ?, ?)', ["urlresolver", "UrlResolver",  "urlresolver", self.now]) 
+        self.dbcon.commit()    
+                
+        #return allurlsolvedomains 
+    def YTDL_domain_check(self):
+        #try:
+            YTdl = True
+            from YDStreamExtractor import getVideoInfo # import this first. it will add profile youtube-dl to sys 
+            import youtube_dl
+            from youtube_dl import extractor as _EX
+            extractors= _EX.list_extractors('18') # cache that
+            for extractor in extractors:
+                if not extractor.IE_NAME == 'generic':
+                    name=extractor.IE_NAME.lower()
+                    
+                    if not name in self.allurlsolvedomains:
+                        self.c.execute('INSERT OR IGNORE INTO urlresolvers(resolver, pattern ,supported_plugins , blacklisted ) VALUES( ?, ?, ?, ?)', [name, name,  "youtube-dl", "n"])
+                    else:
+                        self.c.execute('UPDATE urlresolvers SET supported_plugins = ?  WHERE resolver= ?',["youtube-dl,urlresolver",name])
+            self.c.execute('INSERT OR IGNORE INTO up_source(source_id , title ,url , last_updated ) VALUES( ?, ?, ?, ?)', ["youtube-dl", "Youtube-dl",  "youtube-dl", self.now])                         
+            self.dbcon.commit()    
+            
+            #names=list(set([extractor.IE_NAME.lower() \
+            #                for extractor in extractors if not extractor.IE_NAME == 'generic']))
+            #if not any(((name in hostname) or (hostname in name)) for name in names):
+            #    xbmc.log("This hostname nof found in Youtube-dl module: %s" %hostname, xbmc.LOGNOTICE)
+            #    raise        
+            
+        #except Exception:
+        #    YTdl = False
+
+        #    xbmc.executebuiltin("XBMC.Notification(LiveStreamsPro,Hostname not found in Youtube-dl module,5000,"")")
+        #return YTdl
+        
+        
+        
+        
 class epgxml_db():
     def __init__(self,epgxml='i',houroffset='0'):
         self.source= houroffset + '_ ' +cacheKey(epgxml)
